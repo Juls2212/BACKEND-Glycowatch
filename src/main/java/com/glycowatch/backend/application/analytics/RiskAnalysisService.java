@@ -7,3 +7,4 @@ public interface RiskAnalysisService {
     RiskAnalysisResponseDto getRiskAnalysis(String authenticatedEmail);
 }
 
+//risk
