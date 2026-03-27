@@ -12,4 +12,4 @@ public interface AlertService {
 
     AlertResponseDto markAsRead(String authenticatedEmail, Long alertId);
 }
-
+//changes
