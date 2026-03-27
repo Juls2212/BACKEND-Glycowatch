@@ -125,5 +125,3 @@ public class AuthServiceImpl implements AuthService {
         return rawEmail == null ? null : rawEmail.trim().toLowerCase();
     }
 }
-
-//auth
