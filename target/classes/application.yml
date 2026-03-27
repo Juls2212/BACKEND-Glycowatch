@@ -24,7 +24,7 @@ spring:
     validate-on-migrate: true
 
 server:
-  port: ${SERVER_PORT:8081}
+  port: ${PORT:${SERVER_PORT:8081}}
 
 jwt:
   secret: ${JWT_SECRET:replace-with-a-very-long-secret-key-at-least-32-characters}
