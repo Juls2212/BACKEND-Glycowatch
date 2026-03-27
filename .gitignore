@@ -1,0 +1,281 @@
+# ==========================================
+# JAVA / MAVEN
+# ==========================================
+target/
+.classpath
+.project
+.settings/
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+/build/
+/.gradle/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.asc
+pom.xml.bak
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+.mvn/wrapper/maven-wrapper.properties
+
+# ==========================================
+# IDE - IntelliJ IDEA
+# ==========================================
+.idea/
+*.iml
+*.iws
+*.ipr
+*.idea
+out/
+
+# ==========================================
+# IDE - Eclipse
+# ==========================================
+.metadata
+bin/
+tmp/
+*.tmp
+*.bak
+*.swp
+*~.nib
+.loadpath
+.recommenders
+
+# ==========================================
+# IDE - VS Code
+# ==========================================
+.vscode/
+*.code-workspace
+.history/
+
+# ==========================================
+# IDE - NetBeans
+# ==========================================
+nbproject/
+build/
+nbbuild/
+dist/
+nbdist/
+.nb-gradle/
+
+# ==========================================
+# IDE - JetBrains
+# ==========================================
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ==========================================
+# SPRING BOOT / APPLICATION CONFIGURATION
+# ==========================================
+# Archivos de configuración local con credenciales
+application.yml
+application.yaml
+application.properties
+application-*.yml
+application-*.yaml
+application-*.properties
+!application.yml.example
+!application-example.yml
+!application.properties.example
+
+# ==========================================
+# BASE DE DATOS
+# ==========================================
+*.db
+*.sqlite
+*.sqlite3
+*.h2.db
+*.ldb
+*.mdb
+*.accdb
+data/
+database/
+*.backup
+*.bak
+*.sql
+!src/main/resources/db/migration/*.sql
+!src/main/resources/db/init*.sql
+
+# ==========================================
+# DOCKER
+# ==========================================
+docker-compose.override.yml
+.dockerignore.local
+.docker/
+
+# ==========================================
+# INFORMACIÓN SENSIBLE Y CREDENCIALES
+# ==========================================
+# Claves y certificados
+*.pem
+*.key
+*.jks
+*.keystore
+*.cer
+*.crt
+*.pfx
+*.p12
+rsa_key
+rsa_key.pub
+id_rsa
+id_rsa.pub
+
+# Variables de entorno
+.env
+.env.local
+.env.*.local
+
+# Archivos de secretos
+secrets/
+.secrets/
+secrets.properties
+secrets.yml
+secrets.json
+
+# ==========================================
+# ARCHIVOS DE LOGS
+# ==========================================
+*.log
+logs/
+log/
+*.log.*
+spring.log
+application.log
+
+# ==========================================
+# ARCHIVOS TEMPORALES Y CACHÉ
+# ==========================================
+*.tmp
+tmp/
+temp/
+*.cache
+.cache/
+*.temp
+
+# ==========================================
+# SISTEMA OPERATIVO
+# ==========================================
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.#*
+
+# ==========================================
+# DATOS DE CARGA Y DATOS SENSIBLES
+# ==========================================
+# Archivos de datos para importación
+data/
+uploads/
+downloads/
+imports/
+exports/
+*.csv
+*.xlsx
+*.xls
+!src/main/resources/data/*.csv
+*.json
+!src/main/resources/data/*.json
+
+# Archivos de prueba con datos reales
+test-data/
+sample-data/
+*.sample
+
+# ==========================================
+# ARCHIVOS DE COMPILACIÓN Y CONSTRUCCIÓN
+# ==========================================
+*.class
+*.jar
+*.war
+*.ear
+*.zip
+*.tar
+*.tar.gz
+dist/
+build/
+.gradle
+
+# ==========================================
+# DEPENDENCIAS
+# ==========================================
+node_modules/
+npm-debug.log*
+yarn-error.log*
+lib/
+libs/
+
+# ==========================================
+# COBERTURA Y PRUEBAS
+# ==========================================
+target/test-classes/
+*.exec
+.coverage
+.jacoco.exec
+coverage/
+htmlReport/
+
+# ==========================================
+# ARCHIVOS DE BACKUP
+# ==========================================
+*.bak
+*.backup
+*.old
+*~
+.#*
+
+# ==========================================
+# GESTIÓN DE VERSIONES Y MERGE
+# ==========================================
+*.orig
+*.rej
+.git/
+.gitmodules
+
+# ==========================================
+# ARCHIVOS DE DESARROLLO LOCAL
+# ==========================================
+.vscode/settings.json
+.vscode/launch.json
+local.properties
+development.properties
+dev-config.yml
+local-config.yml
+
+# ==========================================
+# ARCHIVOS PC PERSONALES
+# ==========================================
+.mvn/wrapper/
+*.ini
+.history/
+
+# ==========================================
+# INFORMACIÓN SENSIBLE DE USUARIO
+# ==========================================
+# Credenciales de base de datos locales
+db.properties
+db.yml
+database.properties
+database.yml
+
+# URLs y endpoints locales
+local-endpoints.properties
+.local
+
+# Archivos de configuración con tokens/API keys
+*.key.properties
+*-secrets.*
+*-credentials.*
+*-token.*
+token.txt
+api.key
+api-key.json
