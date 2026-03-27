@@ -55,5 +55,3 @@ public class RiskAnalysisServiceImpl implements RiskAnalysisService {
     }
 }
 
-
-//risk

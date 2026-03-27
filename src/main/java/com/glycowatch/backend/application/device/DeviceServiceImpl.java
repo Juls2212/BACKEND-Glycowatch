@@ -150,3 +150,5 @@ public class DeviceServiceImpl implements DeviceService {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(random);
     }
 }
+
+// device
