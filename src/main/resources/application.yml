@@ -3,7 +3,7 @@ spring:
     name: glycowatch-backend
 
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:glycowatch}
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:glycowatch}?sslmode=require
     username: ${DB_USER:postgres}
     password: ${DB_PASSWORD:22Diciembre2006}
     driver-class-name: org.postgresql.Driver
