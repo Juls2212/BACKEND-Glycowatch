@@ -10,5 +10,3 @@ public interface DashboardService {
 
     List<ChartPointDto> getChartData(String authenticatedEmail);
 }
-
-//dash
