@@ -1,4 +1,0 @@
-ALTER TABLE user_profile
-    ADD COLUMN IF NOT EXISTS weight_kg DECIMAL(6,2) NULL,
-    ADD COLUMN IF NOT EXISTS height_cm DECIMAL(6,2) NULL;
-
