@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Size;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
+// Configuration properties for JWT settings with validation constraints
 @Validated
 @ConfigurationProperties(prefix = "jwt")
 public record JwtProperties(
