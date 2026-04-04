@@ -43,6 +43,7 @@ public class AlertController {
         );
     }
 
+    //change to patch
     @PutMapping("/{id}/read")
     @Operation(summary = "Mark alert as read")
     public ResponseEntity<ApiResponse<AlertResponseDto>> markAsRead(
