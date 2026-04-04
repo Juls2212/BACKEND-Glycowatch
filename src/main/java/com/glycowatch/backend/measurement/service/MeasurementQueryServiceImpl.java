@@ -21,6 +21,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+// Service implementation for querying glucose measurements with pagination and filtering
 @Service
 @RequiredArgsConstructor
 public class MeasurementQueryServiceImpl implements MeasurementQueryService {
