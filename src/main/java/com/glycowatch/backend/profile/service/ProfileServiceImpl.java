@@ -7,7 +7,9 @@ import com.glycowatch.backend.auth.repository.UserRepository;
 import com.glycowatch.backend.profile.dto.ProfileResponseDto;
 import com.glycowatch.backend.profile.dto.UpdateProfileRequestDto;
 import com.glycowatch.backend.common.exception.ApiException;
+import java.time.DateTimeException;
 import java.time.Instant;
+import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -41,7 +43,7 @@ public class ProfileServiceImpl implements ProfileService {
         profile.setBirthDate(request.birthDate());
         profile.setHypoglycemiaThreshold(request.hypoglycemiaThreshold());
         profile.setHyperglycemiaThreshold(request.hyperglycemiaThreshold());
-        profile.setTimezone(trimToNull(request.timezone()));
+        profile.setTimezone(normalizeTimezone(request.timezone()));
         profile.setWeightKg(request.weightKg());
         profile.setHeightCm(request.heightCm());
         profile.setUpdatedAt(Instant.now());
@@ -77,6 +79,18 @@ public class ProfileServiceImpl implements ProfileService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String normalizeTimezone(String timezone) {
+        String normalized = trimToNull(timezone);
+        if (normalized == null) {
+            return null;
+        }
+        try {
+            return ZoneId.of(normalized).getId();
+        } catch (DateTimeException ex) {
+            throw new ApiException("INVALID_TIMEZONE", "Timezone is invalid.", HttpStatus.BAD_REQUEST);
+        }
     }
 }
 
