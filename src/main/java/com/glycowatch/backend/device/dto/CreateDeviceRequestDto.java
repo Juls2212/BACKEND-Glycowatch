@@ -12,6 +12,18 @@ public record CreateDeviceRequestDto(
         @Size(max = 255, message = "Identifier cannot exceed 255 characters.")
         String identifier
 ) {
+    public CreateDeviceRequestDto {
+        name = trimToNull(name);
+        identifier = trimToNull(identifier);
+    }
+
+    private static String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
 }
 
 

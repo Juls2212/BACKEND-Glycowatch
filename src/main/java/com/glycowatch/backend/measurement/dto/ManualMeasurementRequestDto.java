@@ -2,6 +2,7 @@ package com.glycowatch.backend.measurement.dto;
 
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PastOrPresent;
@@ -12,6 +13,7 @@ public record ManualMeasurementRequestDto(
         @NotNull(message = "Glucose value is required.")
         @DecimalMin(value = "1.00", message = "Glucose value must be >= 1.")
         @DecimalMax(value = "1000.00", message = "Glucose value must be <= 1000.")
+        @Digits(integer = 4, fraction = 2, message = "Glucose value must have up to 4 integer digits and 2 decimal places.")
         BigDecimal glucoseValue,
 
         @NotBlank(message = "Unit is required.")
@@ -21,5 +23,16 @@ public record ManualMeasurementRequestDto(
         @PastOrPresent(message = "Measured timestamp cannot be in the future.")
         Instant measuredAt
 ) {
+    public ManualMeasurementRequestDto {
+        unit = trimToNull(unit);
+    }
+
+    private static String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
 }
 

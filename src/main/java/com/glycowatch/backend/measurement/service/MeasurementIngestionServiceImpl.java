@@ -36,6 +36,8 @@ public class MeasurementIngestionServiceImpl implements MeasurementIngestionServ
             String deviceKeyHeader,
             IngestMeasurementRequestDto request
     ) {
+        validationSupport.validateMeasuredAtNotInFuture(request.measuredAt());
+
         String deviceIdentifier = validateHeader(deviceIdentifierHeader, "X-DEVICE-ID");
         String deviceKey = validateHeader(deviceKeyHeader, "X-DEVICE-KEY");
 
@@ -110,4 +112,3 @@ public class MeasurementIngestionServiceImpl implements MeasurementIngestionServ
                 .orElseThrow(() -> new ApiException("DEVICE_NOT_AUTHORIZED", "Device credentials are invalid.", HttpStatus.UNAUTHORIZED));
     }
 }
-
