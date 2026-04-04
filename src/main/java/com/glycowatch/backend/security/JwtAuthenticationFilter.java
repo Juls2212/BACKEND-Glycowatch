@@ -19,7 +19,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final CustomUserDetailsService customUserDetailsService;
-
+//jwt authentication filter
     @Override
     protected void doFilterInternal(
             HttpServletRequest request,
