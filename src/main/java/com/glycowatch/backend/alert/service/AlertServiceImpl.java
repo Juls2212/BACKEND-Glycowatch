@@ -105,6 +105,7 @@ public class AlertServiceImpl implements AlertService {
         return "Low glucose detected: " + glucoseValue + " mg/dL.";
     }
 
+    //alert service
     private AlertResponseDto toAlertResponse(AlertEntity alert) {
         return new AlertResponseDto(
                 alert.getId(),
