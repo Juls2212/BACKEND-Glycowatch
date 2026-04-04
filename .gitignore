@@ -279,3 +279,9 @@ local-endpoints.properties
 token.txt
 api.key
 api-key.json
+
+# Local secrets / local run scripts
+run-local.ps1
+.env
+.env.local
+application-local.secret.yml
