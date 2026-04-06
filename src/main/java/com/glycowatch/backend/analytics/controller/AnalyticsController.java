@@ -18,6 +18,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+// <summary>
+// Controller for analytics-related endpoints, providing data for dashboards and risk analysis.
 @RestController
 @RequestMapping("/api/v1/analytics")
 @RequiredArgsConstructor
