@@ -3,6 +3,8 @@ package com.glycowatch.backend.profile.model;
 import com.glycowatch.backend.auth.model.UserEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -56,6 +58,10 @@ public class UserProfileEntity {
 
     @Column(name = "height_cm", precision = 6, scale = 2)
     private BigDecimal heightCm;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "diabetes_type", length = 30)
+    private DiabetesType diabetesType;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;

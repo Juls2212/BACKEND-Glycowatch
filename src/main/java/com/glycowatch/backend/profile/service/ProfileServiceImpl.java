@@ -46,6 +46,7 @@ public class ProfileServiceImpl implements ProfileService {
         profile.setTimezone(normalizeTimezone(request.timezone()));
         profile.setWeightKg(request.weightKg());
         profile.setHeightCm(request.heightCm());
+        profile.setDiabetesType(request.diabetesType());
         profile.setUpdatedAt(Instant.now());
         profile.setUpdatedBy(user.getEmail());
 
@@ -69,7 +70,8 @@ public class ProfileServiceImpl implements ProfileService {
                 profile.getHyperglycemiaThreshold(),
                 profile.getTimezone(),
                 profile.getWeightKg(),
-                profile.getHeightCm()
+                profile.getHeightCm(),
+                profile.getDiabetesType()
         );
     }
 

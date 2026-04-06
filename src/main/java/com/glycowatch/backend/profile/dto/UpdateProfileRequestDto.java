@@ -1,5 +1,6 @@
 package com.glycowatch.backend.profile.dto;
 
+import com.glycowatch.backend.profile.model.DiabetesType;
 import com.glycowatch.backend.profile.validation.ValidThresholdRange;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.DecimalMax;
@@ -41,7 +42,10 @@ public record UpdateProfileRequestDto(
         @DecimalMin(value = "30.00", message = "Height must be >= 30 cm.")
         @DecimalMax(value = "300.00", message = "Height must be <= 300 cm.")
         @Digits(integer = 3, fraction = 2, message = "Height must have up to 3 integer digits and 2 decimal places.")
-        BigDecimal heightCm
+        BigDecimal heightCm,
+
+        @NotNull(message = "Diabetes type is required.")
+        DiabetesType diabetesType
 ) {
     public UpdateProfileRequestDto {
         fullName = trimToNull(fullName);
