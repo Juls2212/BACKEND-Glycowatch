@@ -1,5 +1,6 @@
 package com.glycowatch.backend.profile.dto;
 
+import com.glycowatch.backend.profile.model.DiabetesType;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
@@ -12,7 +13,8 @@ public record ProfileResponseDto(
         BigDecimal hyperglycemiaThreshold,
         String timezone,
         BigDecimal weightKg,
-        BigDecimal heightCm
+        BigDecimal heightCm,
+        DiabetesType diabetesType
 ) {
 }
 
