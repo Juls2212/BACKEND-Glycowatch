@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PastOrPresent;
+import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.Instant;
 
@@ -17,6 +18,7 @@ public record IngestMeasurementRequestDto(
         BigDecimal glucoseValue,
 
         @NotBlank(message = "Unit is required.")
+        @Size(max = 20, message = "Unit cannot exceed 20 characters.")
         String unit,
 
         @NotNull(message = "Measured timestamp is required.")
