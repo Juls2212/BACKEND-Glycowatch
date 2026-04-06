@@ -22,6 +22,9 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class MeasurementIngestionServiceImpl implements MeasurementIngestionService {
 
+    private static final int MAX_DEVICE_ID_HEADER_LENGTH = 255;
+    private static final int MAX_DEVICE_KEY_HEADER_LENGTH = 255;
+
     private final DeviceRepository deviceRepository;
     private final UserDeviceLinkRepository userDeviceLinkRepository;
     private final GlucoseMeasurementRepository glucoseMeasurementRepository;
@@ -96,7 +99,14 @@ public class MeasurementIngestionServiceImpl implements MeasurementIngestionServ
         if (value == null || value.isBlank()) {
             throw new ApiException("MISSING_DEVICE_HEADER", headerName + " header is required.", HttpStatus.BAD_REQUEST);
         }
-        return value.trim();
+        String normalized = value.trim();
+        int maxLength = "X-DEVICE-ID".equals(headerName)
+                ? MAX_DEVICE_ID_HEADER_LENGTH
+                : MAX_DEVICE_KEY_HEADER_LENGTH;
+        if (normalized.length() > maxLength) {
+            throw new ApiException("INVALID_DEVICE_HEADER", headerName + " header is too long.", HttpStatus.BAD_REQUEST);
+        }
+        return normalized;
     }
 
     private DeviceEntity resolveDevice(String deviceHeaderValue) {
