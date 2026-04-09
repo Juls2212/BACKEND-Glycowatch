@@ -13,6 +13,7 @@ import org.springframework.integration.mqtt.inbound.MqttPahoMessageDrivenChannel
 import org.springframework.integration.mqtt.support.DefaultPahoMessageConverter;
 import org.springframework.messaging.MessageChannel;
 
+//Mqtt configuration class to set up connection options and message listener for incoming MQTT messages from devices.
 @Configuration
 @EnableConfigurationProperties(MqttProperties.class)
 @ConditionalOnProperty(prefix = "app.mqtt", name = "enabled", havingValue = "true")
