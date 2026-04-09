@@ -35,6 +35,22 @@ public interface GlucoseMeasurementRepository extends JpaRepository<GlucoseMeasu
             Pageable pageable
     );
 
+    List<GlucoseMeasurementEntity> findByUserIdAndIsValidTrueAndMeasuredAtGreaterThanEqualOrderByMeasuredAtAsc(
+            Long userId,
+            Instant from
+    );
+
+    List<GlucoseMeasurementEntity> findByUserIdAndIsValidTrueAndMeasuredAtLessThanEqualOrderByMeasuredAtAsc(
+            Long userId,
+            Instant to
+    );
+
+    List<GlucoseMeasurementEntity> findByUserIdAndIsValidTrueAndMeasuredAtBetweenOrderByMeasuredAtAsc(
+            Long userId,
+            Instant from,
+            Instant to
+    );
+
     Optional<GlucoseMeasurementEntity> findFirstByUserIdAndIsValidTrueOrderByMeasuredAtDesc(Long userId);
 
     Optional<GlucoseMeasurementEntity> findByIdAndUserId(Long id, Long userId);

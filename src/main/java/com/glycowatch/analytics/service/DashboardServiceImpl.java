@@ -11,8 +11,9 @@ import com.glycowatch.common.exception.ApiException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
-import java.util.Comparator;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -69,15 +70,14 @@ public class DashboardServiceImpl implements DashboardService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<ChartPointDto> getChartData(String authenticatedEmail) {
+    public List<ChartPointDto> getChartData(String authenticatedEmail, LocalDate from, LocalDate to) {
         UserEntity user = resolveActiveUser(authenticatedEmail);
+        if (from != null && to != null && from.isAfter(to)) {
+            throw new ApiException("INVALID_DATE_RANGE", "'from' must be earlier than or equal to 'to'.", HttpStatus.BAD_REQUEST);
+        }
 
-        return glucoseMeasurementRepository.findByUserIdAndIsValidTrue(
-                        user.getId(),
-                        PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "measuredAt"))
-                ).getContent().stream()
+        return queryChartMeasurements(user.getId(), from, to).stream()
                 .map(measurement -> new ChartPointDto(measurement.getMeasuredAt(), measurement.getGlucoseValue()))
-                .sorted(Comparator.comparing(ChartPointDto::measuredAt))
                 .toList();
     }
 
@@ -117,7 +117,36 @@ public class DashboardServiceImpl implements DashboardService {
 
     private record RecentStats(BigDecimal average, BigDecimal min, BigDecimal max) {
     }
-}
 
+    private List<GlucoseMeasurementEntity> queryChartMeasurements(Long userId, LocalDate from, LocalDate to) {
+        if (from == null && to == null) {
+            return glucoseMeasurementRepository.findTop20ByUserIdAndIsValidTrueOrderByMeasuredAtDesc(userId).stream()
+                    .sorted((left, right) -> left.getMeasuredAt().compareTo(right.getMeasuredAt()))
+                    .toList();
+        }
+        if (from != null && to == null) {
+            Instant fromInstant = from.atStartOfDay().toInstant(ZoneOffset.UTC);
+            return glucoseMeasurementRepository.findByUserIdAndIsValidTrueAndMeasuredAtGreaterThanEqualOrderByMeasuredAtAsc(
+                    userId,
+                    fromInstant
+            );
+        }
+        if (from == null) {
+            Instant toInstant = to.plusDays(1).atStartOfDay().minusNanos(1).toInstant(ZoneOffset.UTC);
+            return glucoseMeasurementRepository.findByUserIdAndIsValidTrueAndMeasuredAtLessThanEqualOrderByMeasuredAtAsc(
+                    userId,
+                    toInstant
+            );
+        }
+
+        Instant fromInstant = from.atStartOfDay().toInstant(ZoneOffset.UTC);
+        Instant toInstant = to.plusDays(1).atStartOfDay().minusNanos(1).toInstant(ZoneOffset.UTC);
+        return glucoseMeasurementRepository.findByUserIdAndIsValidTrueAndMeasuredAtBetweenOrderByMeasuredAtAsc(
+                userId,
+                fromInstant,
+                toInstant
+        );
+    }
+}
 
 

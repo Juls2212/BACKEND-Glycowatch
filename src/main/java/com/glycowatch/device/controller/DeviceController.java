@@ -5,6 +5,7 @@ import com.glycowatch.device.dto.CreateDeviceRequestDto;
 import com.glycowatch.device.dto.CreateDeviceResponseDto;
 import com.glycowatch.device.dto.DeviceResponseDto;
 import com.glycowatch.device.dto.LinkDeviceResponseDto;
+import com.glycowatch.device.dto.RemoveDeviceResponseDto;
 import com.glycowatch.device.dto.ToggleDeviceResponseDto;
 import com.glycowatch.common.dto.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -16,6 +17,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -106,7 +108,25 @@ public class DeviceController {
                         .build()
         );
     }
-}
 
+    @DeleteMapping("/{id}")
+    @Operation(summary = "Remove a linked device from active management")
+    public ResponseEntity<ApiResponse<RemoveDeviceResponseDto>> removeDevice(
+            Authentication authentication,
+            @PathVariable("id") Long id,
+            HttpServletRequest httpRequest
+    ) {
+        RemoveDeviceResponseDto data = deviceService.removeDevice(authentication.getName(), id);
+        return ResponseEntity.ok(
+                ApiResponse.<RemoveDeviceResponseDto>builder()
+                        .success(true)
+                        .message("Device removed from active management successfully.")
+                        .data(data)
+                        .timestamp(Instant.now())
+                        .path(httpRequest.getRequestURI())
+                        .build()
+        );
+    }
+}
 
 

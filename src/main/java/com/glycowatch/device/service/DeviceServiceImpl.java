@@ -11,6 +11,7 @@ import com.glycowatch.device.dto.CreateDeviceRequestDto;
 import com.glycowatch.device.dto.CreateDeviceResponseDto;
 import com.glycowatch.device.dto.DeviceResponseDto;
 import com.glycowatch.device.dto.LinkDeviceResponseDto;
+import com.glycowatch.device.dto.RemoveDeviceResponseDto;
 import com.glycowatch.device.dto.ToggleDeviceResponseDto;
 import com.glycowatch.common.exception.ApiException;
 import java.security.SecureRandom;
@@ -121,6 +122,37 @@ public class DeviceServiceImpl implements DeviceService {
 
         DeviceEntity updatedDevice = deviceRepository.save(device);
         return new ToggleDeviceResponseDto(updatedDevice.getId(), Boolean.TRUE.equals(updatedDevice.getActive()), updatedDevice.getStatus());
+    }
+
+    @Override
+    @Transactional
+    public RemoveDeviceResponseDto removeDevice(String authenticatedEmail, Long deviceId) {
+        UserEntity user = resolveActiveUser(authenticatedEmail);
+        DeviceEntity device = deviceRepository.findById(deviceId)
+                .orElseThrow(() -> new ApiException("DEVICE_NOT_FOUND", "Device was not found.", HttpStatus.NOT_FOUND));
+
+        UserDeviceLinkEntity activeLink = userDeviceLinkRepository.findByUserIdAndDeviceIdAndActiveTrue(user.getId(), deviceId)
+                .orElseThrow(() -> new ApiException("DEVICE_NOT_LINKED", "Device is not linked to the authenticated user.", HttpStatus.FORBIDDEN));
+
+        Instant now = Instant.now();
+        activeLink.setActive(Boolean.FALSE);
+        activeLink.setUnlinkedAt(now);
+        activeLink.setUpdatedAt(now);
+        activeLink.setUpdatedBy(user.getEmail());
+        userDeviceLinkRepository.save(activeLink);
+
+        device.setActive(Boolean.FALSE);
+        device.setStatus(DeviceStatus.DISABLED);
+        device.setUpdatedAt(now);
+        device.setUpdatedBy(user.getEmail());
+        DeviceEntity updatedDevice = deviceRepository.save(device);
+
+        return new RemoveDeviceResponseDto(
+                updatedDevice.getId(),
+                true,
+                updatedDevice.getStatus(),
+                now
+        );
     }
 
     private UserEntity resolveActiveUser(String authenticatedEmail) {

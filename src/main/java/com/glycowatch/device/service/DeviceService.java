@@ -4,6 +4,7 @@ import com.glycowatch.device.dto.CreateDeviceRequestDto;
 import com.glycowatch.device.dto.CreateDeviceResponseDto;
 import com.glycowatch.device.dto.DeviceResponseDto;
 import com.glycowatch.device.dto.LinkDeviceResponseDto;
+import com.glycowatch.device.dto.RemoveDeviceResponseDto;
 import com.glycowatch.device.dto.ToggleDeviceResponseDto;
 import java.util.List;
 
@@ -16,7 +17,8 @@ public interface DeviceService {
     LinkDeviceResponseDto linkDevice(String authenticatedEmail, Long deviceId);
 
     ToggleDeviceResponseDto toggleDevice(String authenticatedEmail, Long deviceId);
-}
 
+    RemoveDeviceResponseDto removeDevice(String authenticatedEmail, Long deviceId);
+}
 
 
