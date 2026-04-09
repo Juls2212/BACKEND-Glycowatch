@@ -49,3 +49,13 @@ management:
 app:
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+  mqtt:
+    enabled: ${MQTT_ENABLED:true}
+    broker-url: ${MQTT_BROKER_URL:tcp://test.mosquitto.org:1883}
+    client-id: ${MQTT_CLIENT_ID:glycowatch-backend-${random.uuid}}
+    topic: ${MQTT_TOPIC:glycowatch/device/+}
+    username: ${MQTT_USERNAME:}
+    password: ${MQTT_PASSWORD:}
+    completion-timeout-ms: ${MQTT_COMPLETION_TIMEOUT_MS:5000}
+    reconnect-delay-ms: ${MQTT_RECONNECT_DELAY_MS:5000}
+    qos: ${MQTT_QOS:1}
