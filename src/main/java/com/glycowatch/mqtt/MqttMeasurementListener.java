@@ -18,6 +18,7 @@ import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageHeaders;
 import org.springframework.stereotype.Component;
 
+//Mqtt listener component to process incoming MQTT messages, validate them, and ingest measurements using the MeasurementIngestionService.
 @Slf4j
 @Component
 @RequiredArgsConstructor
