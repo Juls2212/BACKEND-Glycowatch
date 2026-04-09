@@ -31,7 +31,7 @@ security → JWT and Spring Security config
 
 This structure avoids overengineering while remaining scalable and easy to maintain.
 
-⚙️ Tech Stack
+ Tech Stack
 Java 21
 Spring Boot
 Spring Security (JWT)
@@ -49,10 +49,10 @@ mvn spring-boot:run
 Once the backend is running:
 
 Swagger UI:
-👉 http://localhost:8081/swagger-ui.html
+ http://localhost:8081/swagger-ui.html
 OpenAPI JSON:
-👉 http://localhost:8081/v3/api-docs
-🔐 Environment Variables
+ http://localhost:8081/v3/api-docs
+ Environment Variables
 Variable	Description
 JWT_SECRET	Secret key for JWT signing (min 32 chars)
 DB_HOST	Database host
@@ -61,7 +61,7 @@ DB_NAME	Database name
 DB_USER	Database user
 DB_PASSWORD	Database password
 DB_SSL_MODE	SSL mode (disable/local, require/prod)
-🧪 Main Endpoints
+ Main Endpoints
 Auth
 POST /api/v1/auth/register
 POST /api/v1/auth/login
@@ -78,14 +78,14 @@ GET /api/v1/analytics/dashboard
 GET /api/v1/analytics/risk
 Devices (future-ready)
 POST /api/v1/iot/*
-🧱 Database Strategy
+Database Strategy
 Flyway is used as the single source of truth
 
 Hibernate uses:
 
 ddl-auto: validate
 No automatic schema changes in runtime
-⚠️ Security Notes
+ Security Notes
 No secrets are stored in the repository
 Local configs are handled via environment variables
 Sensitive files are ignored via .gitignore
