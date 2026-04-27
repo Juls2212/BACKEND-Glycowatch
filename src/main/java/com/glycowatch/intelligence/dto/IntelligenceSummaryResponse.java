@@ -16,10 +16,17 @@ import lombok.Setter;
 public class IntelligenceSummaryResponse {
 
     private String riskLevel;
+    private String ruleBasedRiskLevel;
+    private String geminiRiskLevel;
+    private String finalRiskLevel;
+    private String agreementStatus;
     private String trend;
     private String confidence;
     private String assistantMood;
     private String summary;
+    private String aiExplanation;
+    private String assistantMessage;
+    private Boolean geminiAvailable;
     private List<String> detectedFactors;
     private List<String> recommendations;
     private String disclaimer;
