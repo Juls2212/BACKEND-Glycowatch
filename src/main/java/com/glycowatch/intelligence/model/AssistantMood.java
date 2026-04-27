@@ -1,7 +1,10 @@
 package com.glycowatch.intelligence.model;
 
 public enum AssistantMood {
-    NEUTRAL,
-    SUPPORTIVE,
-    ALERT
+    HAPPY,
+    CALM,
+    ATTENTIVE,
+    CONCERNED,
+    ALERT,
+    INSUFFICIENT_DATA
 }
