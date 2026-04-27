@@ -4,6 +4,8 @@ import com.glycowatch.auth.model.UserEntity;
 import com.glycowatch.auth.repository.UserRepository;
 import com.glycowatch.common.exception.ApiException;
 import com.glycowatch.intelligence.dto.IntelligenceSummaryResponse;
+import com.glycowatch.intelligence.integration.GeminiAnalysisResult;
+import com.glycowatch.intelligence.integration.GeminiClient;
 import com.glycowatch.intelligence.model.AgreementStatus;
 import com.glycowatch.intelligence.model.AssistantMood;
 import com.glycowatch.intelligence.model.GlucoseTrend;
@@ -40,6 +42,7 @@ public class IntelligenceServiceImpl implements IntelligenceService {
     private final UserRepository userRepository;
     private final UserProfileRepository userProfileRepository;
     private final GlucoseMeasurementRepository glucoseMeasurementRepository;
+    private final GeminiClient geminiClient;
 
     @Override
     @Transactional(readOnly = true)
@@ -82,24 +85,32 @@ public class IntelligenceServiceImpl implements IntelligenceService {
                 thresholds.hyperglycemiaThreshold().doubleValue()
         );
         IntelligenceConfidence confidence = calculateConfidence(metrics.getCountLast7d());
-        AssistantMood assistantMood = determineAssistantMood(riskLevel);
         String summary = buildSummary(riskLevel, trend, metrics);
+        HybridAnalysis hybridAnalysis = mergeGeminiAnalysis(
+                metrics,
+                trend,
+                riskLevel,
+                detectedFactors,
+                recommendations,
+                summary
+        );
+        AssistantMood assistantMood = determineAssistantMood(hybridAnalysis.finalRiskLevel());
 
         return IntelligenceSummaryResponse.builder()
                 .riskLevel(riskLevel.name())
                 .ruleBasedRiskLevel(riskLevel.name())
-                .geminiRiskLevel(null)
-                .finalRiskLevel(riskLevel.name())
-                .agreementStatus(AgreementStatus.GEMINI_UNAVAILABLE.name())
+                .geminiRiskLevel(hybridAnalysis.geminiRiskLevel())
+                .finalRiskLevel(hybridAnalysis.finalRiskLevel().name())
+                .agreementStatus(hybridAnalysis.agreementStatus().name())
                 .trend(trend.name())
                 .confidence(confidence.name())
                 .assistantMood(assistantMood.name())
                 .summary(summary)
-                .aiExplanation(summary)
-                .assistantMessage(buildAssistantMessage(riskLevel))
-                .geminiAvailable(Boolean.FALSE)
+                .aiExplanation(hybridAnalysis.aiExplanation())
+                .assistantMessage(hybridAnalysis.assistantMessage())
+                .geminiAvailable(hybridAnalysis.geminiAvailable())
                 .detectedFactors(detectedFactors)
-                .recommendations(recommendations)
+                .recommendations(hybridAnalysis.recommendations())
                 .disclaimer(DISCLAIMER)
                 .generatedAt(Instant.now())
                 .build();
@@ -518,6 +529,103 @@ public class IntelligenceServiceImpl implements IntelligenceService {
         };
     }
 
+    private HybridAnalysis mergeGeminiAnalysis(
+            GlucoseAnalysisMetrics metrics,
+            GlucoseTrend trend,
+            RiskLevel ruleBasedRiskLevel,
+            List<String> detectedFactors,
+            List<String> currentRecommendations,
+            String summary
+    ) {
+        if (!geminiClient.isAvailable()) {
+            return buildGeminiUnavailable(ruleBasedRiskLevel, currentRecommendations, summary);
+        }
+
+        java.util.Optional<GeminiAnalysisResult> geminiResultOptional = geminiClient.generateGlucoseAnalysis(
+                metrics,
+                trend,
+                ruleBasedRiskLevel,
+                detectedFactors,
+                currentRecommendations
+        );
+
+        if (geminiResultOptional.isEmpty()) {
+            return buildGeminiUnavailable(ruleBasedRiskLevel, currentRecommendations, summary);
+        }
+
+        GeminiAnalysisResult geminiResult = geminiResultOptional.get();
+        RiskLevel geminiRiskLevel;
+        try {
+            geminiRiskLevel = RiskLevel.valueOf(geminiResult.getRiskLevel().trim());
+        } catch (IllegalArgumentException ex) {
+            return buildGeminiUnavailable(ruleBasedRiskLevel, currentRecommendations, summary);
+        }
+
+        RiskLevel finalRiskLevel = moreConservativeRisk(ruleBasedRiskLevel, geminiRiskLevel);
+        AgreementStatus agreementStatus = determineAgreementStatus(ruleBasedRiskLevel, geminiRiskLevel);
+        List<String> finalRecommendations = geminiResult.getRecommendations() != null && !geminiResult.getRecommendations().isEmpty()
+                ? geminiResult.getRecommendations()
+                : currentRecommendations;
+
+        return new HybridAnalysis(
+                geminiRiskLevel.name(),
+                finalRiskLevel,
+                agreementStatus,
+                geminiResult.getExplanation(),
+                geminiResult.getAssistantMessage(),
+                Boolean.TRUE,
+                finalRecommendations
+        );
+    }
+
+    private HybridAnalysis buildGeminiUnavailable(
+            RiskLevel ruleBasedRiskLevel,
+            List<String> currentRecommendations,
+            String summary
+    ) {
+        return new HybridAnalysis(
+                null,
+                ruleBasedRiskLevel,
+                AgreementStatus.GEMINI_UNAVAILABLE,
+                summary,
+                buildAssistantMessage(ruleBasedRiskLevel),
+                Boolean.FALSE,
+                currentRecommendations
+        );
+    }
+
+    private AgreementStatus determineAgreementStatus(RiskLevel ruleBasedRiskLevel, RiskLevel geminiRiskLevel) {
+        if (ruleBasedRiskLevel == null || geminiRiskLevel == null) {
+            return AgreementStatus.GEMINI_UNAVAILABLE;
+        }
+        if (ruleBasedRiskLevel == geminiRiskLevel) {
+            return AgreementStatus.FULL_AGREEMENT;
+        }
+
+        int difference = Math.abs(riskSeverity(ruleBasedRiskLevel) - riskSeverity(geminiRiskLevel));
+        return difference == 1 ? AgreementStatus.PARTIAL_AGREEMENT : AgreementStatus.DISAGREEMENT;
+    }
+
+    private RiskLevel moreConservativeRisk(RiskLevel left, RiskLevel right) {
+        if (left == null) {
+            return right;
+        }
+        if (right == null) {
+            return left;
+        }
+        return riskSeverity(left) >= riskSeverity(right) ? left : right;
+    }
+
+    private int riskSeverity(RiskLevel riskLevel) {
+        return switch (riskLevel) {
+            case LOW -> 1;
+            case MODERATE -> 2;
+            case HIGH -> 3;
+            case CRITICAL -> 4;
+            case INSUFFICIENT_DATA -> 0;
+        };
+    }
+
     private Double variabilityOf(List<GlucoseMeasurementEntity> measurements) {
         Double min = minOf(measurements);
         Double max = maxOf(measurements);
@@ -527,6 +635,17 @@ public class IntelligenceServiceImpl implements IntelligenceService {
     private record ThresholdWindow(
             BigDecimal hypoglycemiaThreshold,
             BigDecimal hyperglycemiaThreshold
+    ) {
+    }
+
+    private record HybridAnalysis(
+            String geminiRiskLevel,
+            RiskLevel finalRiskLevel,
+            AgreementStatus agreementStatus,
+            String aiExplanation,
+            String assistantMessage,
+            Boolean geminiAvailable,
+            List<String> recommendations
     ) {
     }
 }
