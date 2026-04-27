@@ -78,13 +78,15 @@ public class GeminiClient {
     public Optional<GeminiAnalysisResult> generateGlucoseAnalysis(
             GlucoseAnalysisMetrics metrics,
             GlucoseTrend trend,
-            RiskLevel ruleBasedRiskLevel
+            RiskLevel ruleBasedRiskLevel,
+            List<String> detectedFactors,
+            List<String> currentRecommendations
     ) {
         if (!isAvailable() || metrics == null || trend == null || ruleBasedRiskLevel == null) {
             return Optional.empty();
         }
 
-        String prompt = buildPrompt(metrics, trend, ruleBasedRiskLevel);
+        String prompt = buildPrompt(metrics, trend, ruleBasedRiskLevel, detectedFactors, currentRecommendations);
         return generateContent(prompt).flatMap(this::parseAnalysisResult);
     }
 
@@ -149,11 +151,16 @@ public class GeminiClient {
     private String buildPrompt(
             GlucoseAnalysisMetrics metrics,
             GlucoseTrend trend,
-            RiskLevel ruleBasedRiskLevel
+            RiskLevel ruleBasedRiskLevel,
+            List<String> detectedFactors,
+            List<String> currentRecommendations
     ) {
         return """
                 You are assisting with a glucose trend interpretation task.
                 Respond ONLY with valid JSON. Do not include explanations outside JSON.
+                Do not provide a diagnosis.
+                Do not provide medication instructions.
+                Do not provide dosage advice.
                 Use this exact JSON structure:
                 {
                   "riskLevel": "LOW|MODERATE|HIGH|CRITICAL|INSUFFICIENT_DATA",
@@ -171,6 +178,8 @@ public class GeminiClient {
                 - variability: %s
                 - trend: %s
                 - ruleBasedRiskLevel: %s
+                - detectedFactors: %s
+                - currentRecommendations: %s
                 """.formatted(
                 valueOrNull(metrics.getLatestValue()),
                 valueOrNull(metrics.getAverageLast24h()),
@@ -179,12 +188,18 @@ public class GeminiClient {
                 valueOrNull(metrics.getLowReadingsCount()),
                 valueOrNull(metrics.getVariability()),
                 trend.name(),
-                ruleBasedRiskLevel.name()
+                ruleBasedRiskLevel.name(),
+                listOrEmpty(detectedFactors),
+                listOrEmpty(currentRecommendations)
         );
     }
 
     private String valueOrNull(Object value) {
         return value == null ? "null" : value.toString();
+    }
+
+    private String listOrEmpty(List<String> values) {
+        return values == null || values.isEmpty() ? "[]" : values.toString();
     }
 
     private String stripMarkdownCodeFences(String value) {
