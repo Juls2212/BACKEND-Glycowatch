@@ -1,15 +1,35 @@
 package com.glycowatch.intelligence.integration;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.glycowatch.intelligence.model.GlucoseAnalysisMetrics;
+import com.glycowatch.intelligence.model.GlucoseTrend;
+import com.glycowatch.intelligence.model.RiskLevel;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
+@Slf4j
 @Component
 public class GeminiClient {
 
     private final GeminiProperties geminiProperties;
+    private final ObjectMapper objectMapper;
+    private final RestTemplate restTemplate;
 
-    public GeminiClient(GeminiProperties geminiProperties) {
+    public GeminiClient(GeminiProperties geminiProperties, ObjectMapper objectMapper) {
         this.geminiProperties = geminiProperties;
+        this.objectMapper = objectMapper;
+        this.restTemplate = new RestTemplate();
     }
 
     public boolean isAvailable() {
@@ -21,7 +41,51 @@ public class GeminiClient {
             return Optional.empty();
         }
 
-        return Optional.empty();
+        try {
+            String endpoint = UriComponentsBuilder
+                    .fromHttpUrl(geminiProperties.baseUrl())
+                    .pathSegment("v1beta", "models", geminiProperties.model() + ":generateContent")
+                    .queryParam("key", geminiProperties.apiKey())
+                    .toUriString();
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            GeminiGenerateContentRequest requestBody = new GeminiGenerateContentRequest(
+                    List.of(new GeminiContent(List.of(new GeminiPart(prompt))))
+            );
+
+            ResponseEntity<GeminiGenerateContentResponse> response = restTemplate.postForEntity(
+                    endpoint,
+                    new HttpEntity<>(requestBody, headers),
+                    GeminiGenerateContentResponse.class
+            );
+
+            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+                return Optional.empty();
+            }
+
+            return extractContent(response.getBody());
+        } catch (RestClientException ex) {
+            log.warn("Gemini request failed: {}", ex.getMessage());
+            return Optional.empty();
+        } catch (Exception ex) {
+            log.warn("Gemini response handling failed: {}", ex.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    public Optional<GeminiAnalysisResult> generateGlucoseAnalysis(
+            GlucoseAnalysisMetrics metrics,
+            GlucoseTrend trend,
+            RiskLevel ruleBasedRiskLevel
+    ) {
+        if (!isAvailable() || metrics == null || trend == null || ruleBasedRiskLevel == null) {
+            return Optional.empty();
+        }
+
+        String prompt = buildPrompt(metrics, trend, ruleBasedRiskLevel);
+        return generateContent(prompt).flatMap(this::parseAnalysisResult);
     }
 
     public String getModel() {
@@ -30,5 +94,129 @@ public class GeminiClient {
 
     public String getBaseUrl() {
         return geminiProperties.baseUrl();
+    }
+
+    private Optional<String> extractContent(GeminiGenerateContentResponse response) {
+        if (response.candidates() == null || response.candidates().isEmpty()) {
+            return Optional.empty();
+        }
+
+        GeminiCandidate candidate = response.candidates().getFirst();
+        if (candidate.content() == null || candidate.content().parts() == null || candidate.content().parts().isEmpty()) {
+            return Optional.empty();
+        }
+
+        String text = candidate.content().parts().stream()
+                .map(GeminiPart::text)
+                .filter(StringUtils::hasText)
+                .reduce("", String::concat);
+
+        String normalized = stripMarkdownCodeFences(text);
+        return StringUtils.hasText(normalized) ? Optional.of(normalized) : Optional.empty();
+    }
+
+    private Optional<GeminiAnalysisResult> parseAnalysisResult(String json) {
+        try {
+            GeminiAnalysisResult result = objectMapper.readValue(json, GeminiAnalysisResult.class);
+            if (!isValidResult(result)) {
+                return Optional.empty();
+            }
+            return Optional.of(result);
+        } catch (Exception ex) {
+            log.warn("Gemini JSON parsing failed: {}", ex.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    private boolean isValidResult(GeminiAnalysisResult result) {
+        if (result == null
+                || !StringUtils.hasText(result.getRiskLevel())
+                || !StringUtils.hasText(result.getExplanation())
+                || !StringUtils.hasText(result.getAssistantMessage())
+                || result.getRecommendations() == null
+                || result.getRecommendations().stream().anyMatch(recommendation -> !StringUtils.hasText(recommendation))) {
+            return false;
+        }
+
+        try {
+            RiskLevel.valueOf(result.getRiskLevel().trim());
+            return true;
+        } catch (IllegalArgumentException ex) {
+            return false;
+        }
+    }
+
+    private String buildPrompt(
+            GlucoseAnalysisMetrics metrics,
+            GlucoseTrend trend,
+            RiskLevel ruleBasedRiskLevel
+    ) {
+        return """
+                You are assisting with a glucose trend interpretation task.
+                Respond ONLY with valid JSON. Do not include explanations outside JSON.
+                Use this exact JSON structure:
+                {
+                  "riskLevel": "LOW|MODERATE|HIGH|CRITICAL|INSUFFICIENT_DATA",
+                  "explanation": "short explanation in English",
+                  "assistantMessage": "friendly message for the user",
+                  "recommendations": ["...", "..."]
+                }
+
+                Input data:
+                - latest glucose value: %s
+                - averageLast24h: %s
+                - averageLast7d: %s
+                - highReadingsCount: %s
+                - lowReadingsCount: %s
+                - variability: %s
+                - trend: %s
+                - ruleBasedRiskLevel: %s
+                """.formatted(
+                valueOrNull(metrics.getLatestValue()),
+                valueOrNull(metrics.getAverageLast24h()),
+                valueOrNull(metrics.getAverageLast7d()),
+                valueOrNull(metrics.getHighReadingsCount()),
+                valueOrNull(metrics.getLowReadingsCount()),
+                valueOrNull(metrics.getVariability()),
+                trend.name(),
+                ruleBasedRiskLevel.name()
+        );
+    }
+
+    private String valueOrNull(Object value) {
+        return value == null ? "null" : value.toString();
+    }
+
+    private String stripMarkdownCodeFences(String value) {
+        if (!StringUtils.hasText(value)) {
+            return value;
+        }
+
+        String normalized = value.trim();
+        if (normalized.startsWith("```")) {
+            int firstNewLine = normalized.indexOf('\n');
+            if (firstNewLine >= 0) {
+                normalized = normalized.substring(firstNewLine + 1);
+            }
+            if (normalized.endsWith("```")) {
+                normalized = normalized.substring(0, normalized.length() - 3);
+            }
+        }
+        return normalized.trim();
+    }
+
+    private record GeminiGenerateContentRequest(List<GeminiContent> contents) {
+    }
+
+    private record GeminiGenerateContentResponse(List<GeminiCandidate> candidates) {
+    }
+
+    private record GeminiCandidate(GeminiContent content) {
+    }
+
+    private record GeminiContent(List<GeminiPart> parts) {
+    }
+
+    private record GeminiPart(String text) {
     }
 }
