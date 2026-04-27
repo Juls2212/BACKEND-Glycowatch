@@ -4,6 +4,7 @@ import com.glycowatch.auth.model.UserEntity;
 import com.glycowatch.auth.repository.UserRepository;
 import com.glycowatch.common.exception.ApiException;
 import com.glycowatch.intelligence.dto.IntelligenceSummaryResponse;
+import com.glycowatch.intelligence.model.AgreementStatus;
 import com.glycowatch.intelligence.model.AssistantMood;
 import com.glycowatch.intelligence.model.GlucoseTrend;
 import com.glycowatch.intelligence.model.GlucoseAnalysisMetrics;
@@ -82,13 +83,21 @@ public class IntelligenceServiceImpl implements IntelligenceService {
         );
         IntelligenceConfidence confidence = calculateConfidence(metrics.getCountLast7d());
         AssistantMood assistantMood = determineAssistantMood(riskLevel);
+        String summary = buildSummary(riskLevel, trend, metrics);
 
         return IntelligenceSummaryResponse.builder()
                 .riskLevel(riskLevel.name())
+                .ruleBasedRiskLevel(riskLevel.name())
+                .geminiRiskLevel(null)
+                .finalRiskLevel(riskLevel.name())
+                .agreementStatus(AgreementStatus.GEMINI_UNAVAILABLE.name())
                 .trend(trend.name())
                 .confidence(confidence.name())
                 .assistantMood(assistantMood.name())
-                .summary(buildSummary(riskLevel, trend, metrics))
+                .summary(summary)
+                .aiExplanation(summary)
+                .assistantMessage(buildAssistantMessage(riskLevel))
+                .geminiAvailable(Boolean.FALSE)
                 .detectedFactors(detectedFactors)
                 .recommendations(recommendations)
                 .disclaimer(DISCLAIMER)
@@ -145,12 +154,20 @@ public class IntelligenceServiceImpl implements IntelligenceService {
     }
 
     private IntelligenceSummaryResponse buildInsufficientDataResponse() {
+        String summary = "There is not enough analyzed data yet to generate an intelligence summary.";
         return IntelligenceSummaryResponse.builder()
                 .riskLevel(RiskLevel.INSUFFICIENT_DATA.name())
+                .ruleBasedRiskLevel(RiskLevel.INSUFFICIENT_DATA.name())
+                .geminiRiskLevel(null)
+                .finalRiskLevel(RiskLevel.INSUFFICIENT_DATA.name())
+                .agreementStatus(AgreementStatus.GEMINI_UNAVAILABLE.name())
                 .trend(GlucoseTrend.UNKNOWN.name())
                 .confidence(IntelligenceConfidence.LOW.name())
                 .assistantMood(AssistantMood.INSUFFICIENT_DATA.name())
-                .summary("There is not enough analyzed data yet to generate an intelligence summary.")
+                .summary(summary)
+                .aiExplanation(summary)
+                .assistantMessage("Not enough data is available yet to provide a more detailed analysis.")
+                .geminiAvailable(Boolean.FALSE)
                 .detectedFactors(List.of("Insufficient analyzed data"))
                 .recommendations(List.of("Continue recording measurements to enable future analysis."))
                 .disclaimer(DISCLAIMER)
@@ -485,6 +502,20 @@ public class IntelligenceServiceImpl implements IntelligenceService {
                 trendText,
                 metrics.getLatestValue()
         );
+    }
+
+    private String buildAssistantMessage(RiskLevel riskLevel) {
+        if (riskLevel == null) {
+            return "Continue consistent monitoring while more data is collected.";
+        }
+
+        return switch (riskLevel) {
+            case LOW -> "Current data looks relatively stable. Continue consistent monitoring.";
+            case MODERATE -> "Some changes were detected. Keep monitoring your glucose closely.";
+            case HIGH -> "Recent data shows elevated attention signals. Consider checking your glucose again soon.";
+            case CRITICAL -> "Recent data shows strong warning signals. Recheck your glucose and stay attentive to how you feel.";
+            case INSUFFICIENT_DATA -> "Not enough data is available yet to provide a more detailed analysis.";
+        };
     }
 
     private Double variabilityOf(List<GlucoseMeasurementEntity> measurements) {
