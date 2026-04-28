@@ -4,8 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.glycowatch.intelligence.model.GlucoseAnalysisMetrics;
 import com.glycowatch.intelligence.model.GlucoseTrend;
 import com.glycowatch.intelligence.model.RiskLevel;
+import jakarta.annotation.PostConstruct;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpEntity;
@@ -32,8 +32,18 @@ public class GeminiClient {
         this.restTemplate = new RestTemplate();
     }
 
+    @PostConstruct
+    void logConfiguration() {
+        log.info(
+                "Gemini configuration loaded. apiKeyPresent={}, model={}, baseUrl={}",
+                isAvailable(),
+                getModel(),
+                getBaseUrl()
+        );
+    }
+
     public boolean isAvailable() {
-        return geminiProperties.apiKey() != null && !geminiProperties.apiKey().isBlank();
+        return StringUtils.hasText(normalizedApiKey());
     }
 
     public Optional<String> generateContent(String prompt) {
@@ -43,9 +53,9 @@ public class GeminiClient {
 
         try {
             String endpoint = UriComponentsBuilder
-                    .fromHttpUrl(geminiProperties.baseUrl())
-                    .pathSegment("v1beta", "models", geminiProperties.model() + ":generateContent")
-                    .queryParam("key", geminiProperties.apiKey())
+                    .fromHttpUrl(normalizedApiBaseUrl())
+                    .pathSegment("models", geminiProperties.model() + ":generateContent")
+                    .queryParam("key", normalizedApiKey())
                     .toUriString();
 
             HttpHeaders headers = new HttpHeaders();
@@ -95,7 +105,7 @@ public class GeminiClient {
     }
 
     public String getBaseUrl() {
-        return geminiProperties.baseUrl();
+        return normalizedApiBaseUrl();
     }
 
     private Optional<String> extractContent(GeminiGenerateContentResponse response) {
@@ -196,6 +206,28 @@ public class GeminiClient {
 
     private String valueOrNull(Object value) {
         return value == null ? "null" : value.toString();
+    }
+
+    private String normalizedApiKey() {
+        return geminiProperties.apiKey() == null ? null : geminiProperties.apiKey().trim();
+    }
+
+    private String normalizedApiBaseUrl() {
+        String baseUrl = geminiProperties.baseUrl();
+        if (!StringUtils.hasText(baseUrl)) {
+            return "https://generativelanguage.googleapis.com/v1beta";
+        }
+
+        String normalized = baseUrl.trim();
+        while (normalized.endsWith("/")) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+
+        if (!normalized.endsWith("/v1beta")) {
+            normalized = normalized + "/v1beta";
+        }
+
+        return normalized;
     }
 
     private String listOrEmpty(List<String> values) {
