@@ -1,17 +1,22 @@
 package com.glycowatch.intelligence.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.glycowatch.auth.model.UserEntity;
 import com.glycowatch.auth.repository.UserRepository;
 import com.glycowatch.common.exception.ApiException;
+import com.glycowatch.intelligence.dto.IntelligenceHistoryItemResponse;
 import com.glycowatch.intelligence.dto.IntelligenceSummaryResponse;
 import com.glycowatch.intelligence.integration.GeminiAnalysisResult;
 import com.glycowatch.intelligence.integration.GeminiClient;
 import com.glycowatch.intelligence.model.AgreementStatus;
+import com.glycowatch.intelligence.model.IntelligenceAnalysis;
 import com.glycowatch.intelligence.model.AssistantMood;
 import com.glycowatch.intelligence.model.GlucoseTrend;
 import com.glycowatch.intelligence.model.GlucoseAnalysisMetrics;
 import com.glycowatch.intelligence.model.IntelligenceConfidence;
 import com.glycowatch.intelligence.model.RiskLevel;
+import com.glycowatch.intelligence.repository.IntelligenceAnalysisRepository;
 import com.glycowatch.measurement.model.GlucoseMeasurementEntity;
 import com.glycowatch.measurement.repository.GlucoseMeasurementRepository;
 import com.glycowatch.profile.model.UserProfileEntity;
@@ -42,10 +47,12 @@ public class IntelligenceServiceImpl implements IntelligenceService {
     private final UserRepository userRepository;
     private final UserProfileRepository userProfileRepository;
     private final GlucoseMeasurementRepository glucoseMeasurementRepository;
+    private final IntelligenceAnalysisRepository intelligenceAnalysisRepository;
     private final GeminiClient geminiClient;
+    private final ObjectMapper objectMapper;
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public IntelligenceSummaryResponse getSummary(String authenticatedEmail) {
         UserEntity user = resolveActiveUser(authenticatedEmail);
         UserProfileEntity profile = userProfileRepository.findByUserId(user.getId()).orElse(null);
@@ -96,7 +103,7 @@ public class IntelligenceServiceImpl implements IntelligenceService {
         );
         AssistantMood assistantMood = determineAssistantMood(hybridAnalysis.finalRiskLevel());
 
-        return IntelligenceSummaryResponse.builder()
+        IntelligenceSummaryResponse response = IntelligenceSummaryResponse.builder()
                 .riskLevel(riskLevel.name())
                 .ruleBasedRiskLevel(riskLevel.name())
                 .geminiRiskLevel(hybridAnalysis.geminiRiskLevel())
@@ -114,6 +121,18 @@ public class IntelligenceServiceImpl implements IntelligenceService {
                 .disclaimer(DISCLAIMER)
                 .generatedAt(Instant.now())
                 .build();
+
+        saveAnalysis(user.getId(), response);
+        return response;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<IntelligenceHistoryItemResponse> getHistory(String authenticatedEmail) {
+        UserEntity user = resolveActiveUser(authenticatedEmail);
+        return intelligenceAnalysisRepository.findTop20ByUserIdOrderByCreatedAtDesc(user.getId()).stream()
+                .map(this::toHistoryItemResponse)
+                .toList();
     }
 
     private UserEntity resolveActiveUser(String authenticatedEmail) {
@@ -614,6 +633,55 @@ public class IntelligenceServiceImpl implements IntelligenceService {
             return left;
         }
         return riskSeverity(left) >= riskSeverity(right) ? left : right;
+    }
+
+    private void saveAnalysis(Long userId, IntelligenceSummaryResponse response) {
+        if (userId == null || response == null) {
+            return;
+        }
+
+        IntelligenceAnalysis analysis = IntelligenceAnalysis.builder()
+                .userId(userId)
+                .ruleBasedRiskLevel(response.getRuleBasedRiskLevel())
+                .geminiRiskLevel(response.getGeminiRiskLevel())
+                .finalRiskLevel(response.getFinalRiskLevel())
+                .trend(response.getTrend())
+                .confidence(response.getConfidence())
+                .assistantMood(response.getAssistantMood())
+                .summary(response.getSummary())
+                .aiExplanation(response.getAiExplanation())
+                .assistantMessage(response.getAssistantMessage())
+                .detectedFactors(toJson(response.getDetectedFactors()))
+                .recommendations(toJson(response.getRecommendations()))
+                .agreementStatus(response.getAgreementStatus())
+                .createdAt(response.getGeneratedAt())
+                .build();
+
+        intelligenceAnalysisRepository.save(analysis);
+    }
+
+    private IntelligenceHistoryItemResponse toHistoryItemResponse(IntelligenceAnalysis analysis) {
+        return IntelligenceHistoryItemResponse.builder()
+                .id(analysis.getId())
+                .finalRiskLevel(analysis.getFinalRiskLevel())
+                .trend(analysis.getTrend())
+                .assistantMood(analysis.getAssistantMood())
+                .summary(analysis.getSummary())
+                .createdAt(analysis.getCreatedAt())
+                .build();
+    }
+
+    private String toJson(List<String> values) {
+        List<String> safeValues = values == null ? List.of() : values;
+        try {
+            return objectMapper.writeValueAsString(safeValues);
+        } catch (JsonProcessingException ex) {
+            throw new ApiException(
+                    "INTELLIGENCE_SERIALIZATION_ERROR",
+                    "Unable to serialize intelligence analysis details.",
+                    HttpStatus.INTERNAL_SERVER_ERROR
+            );
+        }
     }
 
     private int riskSeverity(RiskLevel riskLevel) {
