@@ -27,6 +27,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -43,6 +44,7 @@ public class IntelligenceServiceImpl implements IntelligenceService {
     private static final double TREND_DELTA_THRESHOLD = 15.0;
     private static final double HIGH_VARIABILITY_THRESHOLD = 40.0;
     private static final double RISK_VARIABILITY_THRESHOLD = 80.0;
+    private static final long DUPLICATE_WINDOW_MINUTES = 10;
 
     private final UserRepository userRepository;
     private final UserProfileRepository userProfileRepository;
@@ -640,6 +642,10 @@ public class IntelligenceServiceImpl implements IntelligenceService {
             return;
         }
 
+        if (shouldSkipSave(userId, response)) {
+            return;
+        }
+
         IntelligenceAnalysis analysis = IntelligenceAnalysis.builder()
                 .userId(userId)
                 .ruleBasedRiskLevel(response.getRuleBasedRiskLevel())
@@ -658,6 +664,35 @@ public class IntelligenceServiceImpl implements IntelligenceService {
                 .build();
 
         intelligenceAnalysisRepository.save(analysis);
+    }
+
+    private boolean shouldSkipSave(Long userId, IntelligenceSummaryResponse response) {
+        return intelligenceAnalysisRepository.findFirstByUserIdOrderByCreatedAtDesc(userId)
+                .filter(existing -> wasCreatedWithinDuplicateWindow(existing.getCreatedAt(), response.getGeneratedAt()))
+                .filter(existing -> isEquivalentAnalysis(existing, response))
+                .isPresent();
+    }
+
+    private boolean wasCreatedWithinDuplicateWindow(Instant existingCreatedAt, Instant newGeneratedAt) {
+        if (existingCreatedAt == null || newGeneratedAt == null) {
+            return false;
+        }
+
+        Instant duplicateThreshold = newGeneratedAt.minus(DUPLICATE_WINDOW_MINUTES, ChronoUnit.MINUTES);
+        return !existingCreatedAt.isBefore(duplicateThreshold);
+    }
+
+    private boolean isEquivalentAnalysis(IntelligenceAnalysis existing, IntelligenceSummaryResponse response) {
+        if (existing == null || response == null) {
+            return false;
+        }
+
+        return Objects.equals(existing.getFinalRiskLevel(), response.getFinalRiskLevel())
+                && Objects.equals(existing.getTrend(), response.getTrend())
+                && Objects.equals(existing.getAssistantMood(), response.getAssistantMood())
+                && Objects.equals(existing.getSummary(), response.getSummary())
+                && Objects.equals(existing.getAssistantMessage(), response.getAssistantMessage())
+                && Objects.equals(existing.getAgreementStatus(), response.getAgreementStatus());
     }
 
     private IntelligenceHistoryItemResponse toHistoryItemResponse(IntelligenceAnalysis analysis) {
