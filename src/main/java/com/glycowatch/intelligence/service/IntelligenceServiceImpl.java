@@ -8,7 +8,6 @@ import com.glycowatch.common.exception.ApiException;
 import com.glycowatch.intelligence.dto.IntelligenceHistoryItemResponse;
 import com.glycowatch.intelligence.dto.IntelligenceSummaryResponse;
 import com.glycowatch.intelligence.integration.GeminiAnalysisResult;
-import com.glycowatch.intelligence.integration.GeminiClient;
 import com.glycowatch.intelligence.model.AgreementStatus;
 import com.glycowatch.intelligence.model.IntelligenceAnalysis;
 import com.glycowatch.intelligence.model.AssistantMood;
@@ -47,7 +46,7 @@ public class IntelligenceServiceImpl implements IntelligenceService {
     private final IntelligenceAnalysisRepository intelligenceAnalysisRepository;
     private final RuleBasedIntelligenceAnalyzer ruleBasedIntelligenceAnalyzer;
     private final IntelligenceSummaryMapper intelligenceSummaryMapper;
-    private final GeminiClient geminiClient;
+    private final ExternalIntelligenceProvider externalIntelligenceProvider;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -203,11 +202,11 @@ public class IntelligenceServiceImpl implements IntelligenceService {
             List<String> currentRecommendations,
             String summary
     ) {
-        if (!geminiClient.isAvailable()) {
+        if (!externalIntelligenceProvider.isAvailable()) {
             return buildGeminiUnavailable(ruleBasedRiskLevel, currentRecommendations, summary);
         }
 
-        java.util.Optional<GeminiAnalysisResult> geminiResultOptional = geminiClient.generateGlucoseAnalysis(
+        java.util.Optional<GeminiAnalysisResult> geminiResultOptional = externalIntelligenceProvider.generateGlucoseAnalysis(
                 metrics,
                 trend,
                 ruleBasedRiskLevel,
