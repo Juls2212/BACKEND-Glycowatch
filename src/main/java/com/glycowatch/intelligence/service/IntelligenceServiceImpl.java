@@ -12,8 +12,8 @@ import com.glycowatch.intelligence.integration.GeminiClient;
 import com.glycowatch.intelligence.model.AgreementStatus;
 import com.glycowatch.intelligence.model.IntelligenceAnalysis;
 import com.glycowatch.intelligence.model.AssistantMood;
-import com.glycowatch.intelligence.model.GlucoseTrend;
 import com.glycowatch.intelligence.model.GlucoseAnalysisMetrics;
+import com.glycowatch.intelligence.model.GlucoseTrend;
 import com.glycowatch.intelligence.model.IntelligenceConfidence;
 import com.glycowatch.intelligence.model.RiskLevel;
 import com.glycowatch.intelligence.repository.IntelligenceAnalysisRepository;
@@ -24,8 +24,6 @@ import com.glycowatch.profile.repository.UserProfileRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Comparator;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
@@ -41,15 +39,14 @@ public class IntelligenceServiceImpl implements IntelligenceService {
             "This analysis is informational and does not replace professional medical advice.";
     private static final BigDecimal DEFAULT_HYPOGLYCEMIA_THRESHOLD = new BigDecimal("70");
     private static final BigDecimal DEFAULT_HYPERGLYCEMIA_THRESHOLD = new BigDecimal("180");
-    private static final double TREND_DELTA_THRESHOLD = 15.0;
-    private static final double HIGH_VARIABILITY_THRESHOLD = 40.0;
-    private static final double RISK_VARIABILITY_THRESHOLD = 80.0;
     private static final long DUPLICATE_WINDOW_MINUTES = 10;
 
     private final UserRepository userRepository;
     private final UserProfileRepository userProfileRepository;
     private final GlucoseMeasurementRepository glucoseMeasurementRepository;
     private final IntelligenceAnalysisRepository intelligenceAnalysisRepository;
+    private final RuleBasedIntelligenceAnalyzer ruleBasedIntelligenceAnalyzer;
+    private final IntelligenceSummaryMapper intelligenceSummaryMapper;
     private final GeminiClient geminiClient;
     private final ObjectMapper objectMapper;
 
@@ -61,68 +58,53 @@ public class IntelligenceServiceImpl implements IntelligenceService {
         ThresholdWindow thresholds = resolveThresholds(profile);
         List<GlucoseMeasurementEntity> last7DaysMeasurements = getMeasurementsLast7Days(user.getId());
         List<GlucoseMeasurementEntity> last24HoursMeasurements = getMeasurementsLast24Hours(user.getId());
-        GlucoseAnalysisMetrics metrics = computeMetrics(
+        RuleBasedIntelligenceAnalyzer.RuleBasedAnalysis ruleBasedAnalysis = ruleBasedIntelligenceAnalyzer.analyze(
                 last24HoursMeasurements,
                 last7DaysMeasurements,
                 thresholds.hypoglycemiaThreshold(),
                 thresholds.hyperglycemiaThreshold()
         );
 
-        consumePreparedInputs(user, thresholds, last7DaysMeasurements, last24HoursMeasurements, metrics);
+        consumePreparedInputs(user, thresholds, last7DaysMeasurements, last24HoursMeasurements, ruleBasedAnalysis);
 
-        if (last7DaysMeasurements.size() < 3) {
+        if (!ruleBasedAnalysis.hasSufficientData()) {
             return buildInsufficientDataResponse();
         }
 
-        GlucoseTrend trend = calculateTrend(last7DaysMeasurements);
-        RiskLevel riskLevel = calculateRisk(
-                metrics,
-                trend,
-                thresholds.hypoglycemiaThreshold().doubleValue(),
-                thresholds.hyperglycemiaThreshold().doubleValue()
-        );
-        List<String> detectedFactors = generateFactors(
-                metrics,
-                trend,
-                thresholds.hypoglycemiaThreshold().doubleValue(),
-                thresholds.hyperglycemiaThreshold().doubleValue()
-        );
-        List<String> recommendations = generateRecommendations(
-                metrics,
-                trend,
-                thresholds.hypoglycemiaThreshold().doubleValue(),
-                thresholds.hyperglycemiaThreshold().doubleValue()
-        );
-        IntelligenceConfidence confidence = calculateConfidence(metrics.getCountLast7d());
-        String summary = buildSummary(riskLevel, trend, metrics);
+        GlucoseTrend trend = ruleBasedAnalysis.trend();
+        RiskLevel riskLevel = ruleBasedAnalysis.riskLevel();
+        List<String> detectedFactors = ruleBasedAnalysis.detectedFactors();
+        List<String> recommendations = ruleBasedAnalysis.recommendations();
+        IntelligenceConfidence confidence = ruleBasedAnalysis.confidence();
+        String summary = ruleBasedAnalysis.summary();
         HybridAnalysis hybridAnalysis = mergeGeminiAnalysis(
-                metrics,
+                ruleBasedAnalysis.metrics(),
                 trend,
                 riskLevel,
                 detectedFactors,
                 recommendations,
                 summary
         );
-        AssistantMood assistantMood = determineAssistantMood(hybridAnalysis.finalRiskLevel());
+        AssistantMood assistantMood = ruleBasedIntelligenceAnalyzer.determineAssistantMood(hybridAnalysis.finalRiskLevel());
+        Instant generatedAt = Instant.now();
 
-        IntelligenceSummaryResponse response = IntelligenceSummaryResponse.builder()
-                .riskLevel(riskLevel.name())
-                .ruleBasedRiskLevel(riskLevel.name())
-                .geminiRiskLevel(hybridAnalysis.geminiRiskLevel())
-                .finalRiskLevel(hybridAnalysis.finalRiskLevel().name())
-                .agreementStatus(hybridAnalysis.agreementStatus().name())
-                .trend(trend.name())
-                .confidence(confidence.name())
-                .assistantMood(assistantMood.name())
-                .summary(summary)
-                .aiExplanation(hybridAnalysis.aiExplanation())
-                .assistantMessage(hybridAnalysis.assistantMessage())
-                .geminiAvailable(hybridAnalysis.geminiAvailable())
-                .detectedFactors(detectedFactors)
-                .recommendations(hybridAnalysis.recommendations())
-                .disclaimer(DISCLAIMER)
-                .generatedAt(Instant.now())
-                .build();
+        IntelligenceSummaryResponse response = intelligenceSummaryMapper.toSummaryResponse(
+                riskLevel,
+                trend,
+                confidence,
+                assistantMood,
+                summary,
+                hybridAnalysis.geminiRiskLevel(),
+                hybridAnalysis.finalRiskLevel(),
+                hybridAnalysis.agreementStatus(),
+                hybridAnalysis.aiExplanation(),
+                hybridAnalysis.assistantMessage(),
+                hybridAnalysis.geminiAvailable(),
+                detectedFactors,
+                hybridAnalysis.recommendations(),
+                DISCLAIMER,
+                generatedAt
+        );
 
         saveAnalysis(user.getId(), response);
         return response;
@@ -173,366 +155,29 @@ public class IntelligenceServiceImpl implements IntelligenceService {
             ThresholdWindow thresholds,
             List<GlucoseMeasurementEntity> last7DaysMeasurements,
             List<GlucoseMeasurementEntity> last24HoursMeasurements,
-            GlucoseAnalysisMetrics metrics
+            RuleBasedIntelligenceAnalyzer.RuleBasedAnalysis ruleBasedAnalysis
     ) {
         // Intentionally unused for now; this keeps the service prepared for the next real analysis step.
         if (user == null
                 || thresholds == null
                 || last7DaysMeasurements == null
                 || last24HoursMeasurements == null
-                || metrics == null) {
+                || ruleBasedAnalysis == null
+                || ruleBasedAnalysis.metrics() == null) {
             throw new IllegalStateException("Prepared intelligence inputs must not be null.");
         }
     }
 
     private IntelligenceSummaryResponse buildInsufficientDataResponse() {
         String summary = "There is not enough analyzed data yet to generate an intelligence summary.";
-        return IntelligenceSummaryResponse.builder()
-                .riskLevel(RiskLevel.INSUFFICIENT_DATA.name())
-                .ruleBasedRiskLevel(RiskLevel.INSUFFICIENT_DATA.name())
-                .geminiRiskLevel(null)
-                .finalRiskLevel(RiskLevel.INSUFFICIENT_DATA.name())
-                .agreementStatus(AgreementStatus.GEMINI_UNAVAILABLE.name())
-                .trend(GlucoseTrend.UNKNOWN.name())
-                .confidence(IntelligenceConfidence.LOW.name())
-                .assistantMood(AssistantMood.INSUFFICIENT_DATA.name())
-                .summary(summary)
-                .aiExplanation(summary)
-                .assistantMessage("Not enough data is available yet to provide a more detailed analysis.")
-                .geminiAvailable(Boolean.FALSE)
-                .detectedFactors(List.of("Insufficient analyzed data"))
-                .recommendations(List.of("Continue recording measurements to enable future analysis."))
-                .disclaimer(DISCLAIMER)
-                .generatedAt(Instant.now())
-                .build();
-    }
-
-    private GlucoseAnalysisMetrics computeMetrics(
-            List<GlucoseMeasurementEntity> last24HoursMeasurements,
-            List<GlucoseMeasurementEntity> last7DaysMeasurements,
-            BigDecimal lowThreshold,
-            BigDecimal highThreshold
-    ) {
-        GlucoseAnalysisMetrics metrics = new GlucoseAnalysisMetrics();
-
-        List<GlucoseMeasurementEntity> safeLast24HoursMeasurements =
-                last24HoursMeasurements == null ? List.of() : last24HoursMeasurements;
-        List<GlucoseMeasurementEntity> safeLast7DaysMeasurements =
-                last7DaysMeasurements == null ? List.of() : last7DaysMeasurements;
-
-        metrics.setCountLast24h(safeLast24HoursMeasurements.size());
-        metrics.setCountLast7d(safeLast7DaysMeasurements.size());
-        metrics.setAverageLast24h(averageOf(safeLast24HoursMeasurements));
-        metrics.setAverageLast7d(averageOf(safeLast7DaysMeasurements));
-        metrics.setMinLast7d(minOf(safeLast7DaysMeasurements));
-        metrics.setMaxLast7d(maxOf(safeLast7DaysMeasurements));
-        metrics.setLatestValue(latestValueOf(safeLast24HoursMeasurements, safeLast7DaysMeasurements));
-        metrics.setLowReadingsCount(countBelowThreshold(safeLast7DaysMeasurements, lowThreshold));
-        metrics.setHighReadingsCount(countAboveThreshold(safeLast7DaysMeasurements, highThreshold));
-
-        Double minLast7d = metrics.getMinLast7d();
-        Double maxLast7d = metrics.getMaxLast7d();
-        metrics.setVariability(minLast7d == null || maxLast7d == null ? null : maxLast7d - minLast7d);
-
-        return metrics;
-    }
-
-    private Double averageOf(List<GlucoseMeasurementEntity> measurements) {
-        if (measurements.isEmpty()) {
-            return null;
-        }
-
-        java.util.OptionalDouble average = measurements.stream()
-                .map(GlucoseMeasurementEntity::getGlucoseValue)
-                .filter(value -> value != null)
-                .mapToDouble(BigDecimal::doubleValue)
-                .average();
-
-        return average.isPresent() ? average.getAsDouble() : null;
-    }
-
-    private Double minOf(List<GlucoseMeasurementEntity> measurements) {
-        return measurements.stream()
-                .map(GlucoseMeasurementEntity::getGlucoseValue)
-                .filter(value -> value != null)
-                .min(BigDecimal::compareTo)
-                .map(BigDecimal::doubleValue)
-                .orElse(null);
-    }
-
-    private Double maxOf(List<GlucoseMeasurementEntity> measurements) {
-        return measurements.stream()
-                .map(GlucoseMeasurementEntity::getGlucoseValue)
-                .filter(value -> value != null)
-                .max(BigDecimal::compareTo)
-                .map(BigDecimal::doubleValue)
-                .orElse(null);
-    }
-
-    private Double latestValueOf(
-            List<GlucoseMeasurementEntity> last24HoursMeasurements,
-            List<GlucoseMeasurementEntity> last7DaysMeasurements
-    ) {
-        return latestMeasurementOf(last24HoursMeasurements).or(() -> latestMeasurementOf(last7DaysMeasurements))
-                .map(GlucoseMeasurementEntity::getGlucoseValue)
-                .map(BigDecimal::doubleValue)
-                .orElse(null);
-    }
-
-    private java.util.Optional<GlucoseMeasurementEntity> latestMeasurementOf(List<GlucoseMeasurementEntity> measurements) {
-        return measurements.stream()
-                .filter(measurement -> measurement.getMeasuredAt() != null && measurement.getGlucoseValue() != null)
-                .max(Comparator.comparing(GlucoseMeasurementEntity::getMeasuredAt));
-    }
-
-    private Integer countBelowThreshold(List<GlucoseMeasurementEntity> measurements, BigDecimal lowThreshold) {
-        if (lowThreshold == null || measurements.isEmpty()) {
-            return 0;
-        }
-
-        return Math.toIntExact(
-                measurements.stream()
-                        .map(GlucoseMeasurementEntity::getGlucoseValue)
-                        .filter(value -> value != null && value.compareTo(lowThreshold) < 0)
-                        .count()
-        );
-    }
-
-    private Integer countAboveThreshold(List<GlucoseMeasurementEntity> measurements, BigDecimal highThreshold) {
-        if (highThreshold == null || measurements.isEmpty()) {
-            return 0;
-        }
-
-        return Math.toIntExact(
-                measurements.stream()
-                        .map(GlucoseMeasurementEntity::getGlucoseValue)
-                        .filter(value -> value != null && value.compareTo(highThreshold) > 0)
-                        .count()
-        );
-    }
-
-    private GlucoseTrend calculateTrend(List<GlucoseMeasurementEntity> last7DaysMeasurements) {
-        List<GlucoseMeasurementEntity> safeMeasurements = last7DaysMeasurements == null
-                ? List.of()
-                : last7DaysMeasurements.stream()
-                        .filter(measurement -> measurement.getMeasuredAt() != null && measurement.getGlucoseValue() != null)
-                        .sorted(Comparator.comparing(GlucoseMeasurementEntity::getMeasuredAt))
-                        .toList();
-
-        if (safeMeasurements.size() < 3) {
-            return GlucoseTrend.UNKNOWN;
-        }
-
-        int midpoint = safeMeasurements.size() / 2;
-        if (midpoint == 0 || midpoint == safeMeasurements.size()) {
-            return GlucoseTrend.UNKNOWN;
-        }
-
-        List<GlucoseMeasurementEntity> firstHalf = safeMeasurements.subList(0, midpoint);
-        List<GlucoseMeasurementEntity> secondHalf = safeMeasurements.subList(midpoint, safeMeasurements.size());
-
-        Double firstHalfAverage = averageOf(firstHalf);
-        Double secondHalfAverage = averageOf(secondHalf);
-        Double variability = variabilityOf(safeMeasurements);
-
-        if (firstHalfAverage == null || secondHalfAverage == null) {
-            return GlucoseTrend.UNKNOWN;
-        }
-
-        if (secondHalfAverage >= firstHalfAverage + TREND_DELTA_THRESHOLD) {
-            return GlucoseTrend.RISING;
-        }
-        if (secondHalfAverage <= firstHalfAverage - TREND_DELTA_THRESHOLD) {
-            return GlucoseTrend.FALLING;
-        }
-        if (variability != null && variability >= HIGH_VARIABILITY_THRESHOLD) {
-            return GlucoseTrend.VARIABLE;
-        }
-
-        return GlucoseTrend.STABLE;
-    }
-
-    private RiskLevel calculateRisk(
-            GlucoseAnalysisMetrics metrics,
-            GlucoseTrend trend,
-            double lowThreshold,
-            double highThreshold
-    ) {
-        if (metrics == null) {
-            return RiskLevel.LOW;
-        }
-
-        int score = 0;
-
-        Double latestValue = metrics.getLatestValue();
-        if (latestValue != null) {
-            if (latestValue > highThreshold) {
-                score += 3;
-            }
-            if (latestValue < lowThreshold) {
-                score += 3;
-            }
-        }
-
-        Double averageLast24h = metrics.getAverageLast24h();
-        if (averageLast24h != null && averageLast24h > highThreshold) {
-            score += 2;
-        }
-
-        Integer highReadingsCount = metrics.getHighReadingsCount();
-        if (highReadingsCount != null && highReadingsCount >= 2) {
-            score += 2;
-        }
-
-        Integer lowReadingsCount = metrics.getLowReadingsCount();
-        if (lowReadingsCount != null && lowReadingsCount >= 1) {
-            score += 2;
-        }
-
-        if (trend == GlucoseTrend.RISING) {
-            score += 2;
-        } else if (trend == GlucoseTrend.VARIABLE) {
-            score += 1;
-        }
-
-        Double variability = metrics.getVariability();
-        if (variability != null && variability >= RISK_VARIABILITY_THRESHOLD) {
-            score += 1;
-        }
-
-        if (score <= 2) {
-            return RiskLevel.LOW;
-        }
-        if (score <= 5) {
-            return RiskLevel.MODERATE;
-        }
-        if (score <= 8) {
-            return RiskLevel.HIGH;
-        }
-        return RiskLevel.CRITICAL;
-    }
-
-    private List<String> generateFactors(
-            GlucoseAnalysisMetrics metrics,
-            GlucoseTrend trend,
-            double lowThreshold,
-            double highThreshold
-    ) {
-        List<String> factors = new ArrayList<>();
-        if (metrics == null) {
-            return factors;
-        }
-
-        Double latestValue = metrics.getLatestValue();
-        if (latestValue != null) {
-            if (latestValue > highThreshold) {
-                factors.add("Latest glucose reading is above the configured high threshold");
-            } else if (latestValue < lowThreshold) {
-                factors.add("Latest glucose reading is below the configured low threshold");
-            }
-        }
-
-        Integer highReadingsCount = metrics.getHighReadingsCount();
-        if (highReadingsCount != null && highReadingsCount >= 2) {
-            factors.add("Multiple high glucose readings detected");
-        }
-
-        Integer lowReadingsCount = metrics.getLowReadingsCount();
-        if (lowReadingsCount != null && lowReadingsCount >= 1) {
-            factors.add("One or more low glucose readings detected");
-        }
-
-        if (trend == GlucoseTrend.RISING) {
-            factors.add("Recent trend is rising");
-        } else if (trend == GlucoseTrend.FALLING) {
-            factors.add("Recent trend is falling");
-        } else if (trend == GlucoseTrend.VARIABLE) {
-            factors.add("Recent glucose behavior is variable");
-        }
-
-        Double variability = metrics.getVariability();
-        if (variability != null && variability >= RISK_VARIABILITY_THRESHOLD) {
-            factors.add("High glucose variability detected");
-        }
-
-        return factors;
-    }
-
-    private List<String> generateRecommendations(
-            GlucoseAnalysisMetrics metrics,
-            GlucoseTrend trend,
-            double lowThreshold,
-            double highThreshold
-    ) {
-        List<String> recommendations = new ArrayList<>();
-
-        if (metrics == null) {
-            recommendations.add("Continue consistent monitoring");
-            return recommendations;
-        }
-
-        Double latestValue = metrics.getLatestValue();
-        if (latestValue != null && (latestValue > highThreshold || latestValue < lowThreshold)) {
-            recommendations.add("Measure glucose again in the next few hours");
-        }
-
-        if (trend == GlucoseTrend.RISING) {
-            recommendations.add("Observe whether values increase after meals");
-        } else if (trend == GlucoseTrend.FALLING) {
-            recommendations.add("Observe whether values decrease after physical activity or fasting periods");
-        } else if (trend == GlucoseTrend.VARIABLE) {
-            recommendations.add("Look for daily patterns that may explain changing glucose values");
-        }
-
-        Double variability = metrics.getVariability();
-        if (variability != null && variability >= RISK_VARIABILITY_THRESHOLD) {
-            recommendations.add("Continue consistent monitoring");
-        }
-
-        if (recommendations.isEmpty()) {
-            recommendations.add("Continue consistent monitoring");
-        }
-
-        return recommendations;
-    }
-
-    private IntelligenceConfidence calculateConfidence(Integer countLast7d) {
-        if (countLast7d == null || countLast7d < 3) {
-            return IntelligenceConfidence.LOW;
-        }
-        if (countLast7d < 8) {
-            return IntelligenceConfidence.MEDIUM;
-        }
-        return IntelligenceConfidence.HIGH;
-    }
-
-    private AssistantMood determineAssistantMood(RiskLevel riskLevel) {
-        if (riskLevel == null) {
-            return AssistantMood.INSUFFICIENT_DATA;
-        }
-
-        return switch (riskLevel) {
-            case LOW -> AssistantMood.CALM;
-            case MODERATE -> AssistantMood.ATTENTIVE;
-            case HIGH -> AssistantMood.CONCERNED;
-            case CRITICAL -> AssistantMood.ALERT;
-            case INSUFFICIENT_DATA -> AssistantMood.INSUFFICIENT_DATA;
-        };
-    }
-
-    private String buildSummary(RiskLevel riskLevel, GlucoseTrend trend, GlucoseAnalysisMetrics metrics) {
-        String riskText = riskLevel == null ? "unknown" : riskLevel.name().toLowerCase().replace('_', ' ');
-        String trendText = trend == null ? "unknown" : trend.name().toLowerCase().replace('_', ' ');
-
-        if (metrics == null || metrics.getLatestValue() == null) {
-            return "Recent glucose data suggests a " + riskText + " risk pattern with a " + trendText + " trend.";
-        }
-
-        return String.format(
-                "Recent glucose data suggests a %s risk pattern with a %s trend. The latest recorded value was %.1f mg/dL.",
-                riskText,
-                trendText,
-                metrics.getLatestValue()
+        return intelligenceSummaryMapper.toInsufficientDataResponse(
+                summary,
+                "Not enough data is available yet to provide a more detailed analysis.",
+                ruleBasedIntelligenceAnalyzer.determineAssistantMood(RiskLevel.INSUFFICIENT_DATA),
+                List.of("Insufficient analyzed data"),
+                List.of("Continue recording measurements to enable future analysis."),
+                DISCLAIMER,
+                Instant.now()
         );
     }
 
@@ -727,12 +372,6 @@ public class IntelligenceServiceImpl implements IntelligenceService {
             case CRITICAL -> 4;
             case INSUFFICIENT_DATA -> 0;
         };
-    }
-
-    private Double variabilityOf(List<GlucoseMeasurementEntity> measurements) {
-        Double min = minOf(measurements);
-        Double max = maxOf(measurements);
-        return min == null || max == null ? null : max - min;
     }
 
     private record ThresholdWindow(
