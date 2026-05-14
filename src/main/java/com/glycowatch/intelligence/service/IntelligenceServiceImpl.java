@@ -1,7 +1,5 @@
 package com.glycowatch.intelligence.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.glycowatch.auth.model.UserEntity;
 import com.glycowatch.auth.repository.UserRepository;
 import com.glycowatch.common.exception.ApiException;
@@ -24,7 +22,6 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
-import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -38,7 +35,6 @@ public class IntelligenceServiceImpl implements IntelligenceService {
             "This analysis is informational and does not replace professional medical advice.";
     private static final BigDecimal DEFAULT_HYPOGLYCEMIA_THRESHOLD = new BigDecimal("70");
     private static final BigDecimal DEFAULT_HYPERGLYCEMIA_THRESHOLD = new BigDecimal("180");
-    private static final long DUPLICATE_WINDOW_MINUTES = 10;
 
     private final UserRepository userRepository;
     private final UserProfileRepository userProfileRepository;
@@ -47,7 +43,7 @@ public class IntelligenceServiceImpl implements IntelligenceService {
     private final RuleBasedIntelligenceAnalyzer ruleBasedIntelligenceAnalyzer;
     private final IntelligenceSummaryMapper intelligenceSummaryMapper;
     private final ExternalIntelligenceProvider externalIntelligenceProvider;
-    private final ObjectMapper objectMapper;
+    private final IntelligenceAnalysisPersistenceService intelligenceAnalysisPersistenceService;
 
     @Override
     @Transactional
@@ -105,7 +101,7 @@ public class IntelligenceServiceImpl implements IntelligenceService {
                 generatedAt
         );
 
-        saveAnalysis(user.getId(), response);
+        intelligenceAnalysisPersistenceService.saveAnalysis(user.getId(), response);
         return response;
     }
 
@@ -281,64 +277,6 @@ public class IntelligenceServiceImpl implements IntelligenceService {
         return riskSeverity(left) >= riskSeverity(right) ? left : right;
     }
 
-    private void saveAnalysis(Long userId, IntelligenceSummaryResponse response) {
-        if (userId == null || response == null) {
-            return;
-        }
-
-        if (shouldSkipSave(userId, response)) {
-            return;
-        }
-
-        IntelligenceAnalysis analysis = IntelligenceAnalysis.builder()
-                .userId(userId)
-                .ruleBasedRiskLevel(response.getRuleBasedRiskLevel())
-                .geminiRiskLevel(response.getGeminiRiskLevel())
-                .finalRiskLevel(response.getFinalRiskLevel())
-                .trend(response.getTrend())
-                .confidence(response.getConfidence())
-                .assistantMood(response.getAssistantMood())
-                .summary(response.getSummary())
-                .aiExplanation(response.getAiExplanation())
-                .assistantMessage(response.getAssistantMessage())
-                .detectedFactors(toJson(response.getDetectedFactors()))
-                .recommendations(toJson(response.getRecommendations()))
-                .agreementStatus(response.getAgreementStatus())
-                .createdAt(response.getGeneratedAt())
-                .build();
-
-        intelligenceAnalysisRepository.save(analysis);
-    }
-
-    private boolean shouldSkipSave(Long userId, IntelligenceSummaryResponse response) {
-        return intelligenceAnalysisRepository.findFirstByUserIdOrderByCreatedAtDesc(userId)
-                .filter(existing -> wasCreatedWithinDuplicateWindow(existing.getCreatedAt(), response.getGeneratedAt()))
-                .filter(existing -> isEquivalentAnalysis(existing, response))
-                .isPresent();
-    }
-
-    private boolean wasCreatedWithinDuplicateWindow(Instant existingCreatedAt, Instant newGeneratedAt) {
-        if (existingCreatedAt == null || newGeneratedAt == null) {
-            return false;
-        }
-
-        Instant duplicateThreshold = newGeneratedAt.minus(DUPLICATE_WINDOW_MINUTES, ChronoUnit.MINUTES);
-        return !existingCreatedAt.isBefore(duplicateThreshold);
-    }
-
-    private boolean isEquivalentAnalysis(IntelligenceAnalysis existing, IntelligenceSummaryResponse response) {
-        if (existing == null || response == null) {
-            return false;
-        }
-
-        return Objects.equals(existing.getFinalRiskLevel(), response.getFinalRiskLevel())
-                && Objects.equals(existing.getTrend(), response.getTrend())
-                && Objects.equals(existing.getAssistantMood(), response.getAssistantMood())
-                && Objects.equals(existing.getSummary(), response.getSummary())
-                && Objects.equals(existing.getAssistantMessage(), response.getAssistantMessage())
-                && Objects.equals(existing.getAgreementStatus(), response.getAgreementStatus());
-    }
-
     private IntelligenceHistoryItemResponse toHistoryItemResponse(IntelligenceAnalysis analysis) {
         return IntelligenceHistoryItemResponse.builder()
                 .id(analysis.getId())
@@ -348,19 +286,6 @@ public class IntelligenceServiceImpl implements IntelligenceService {
                 .summary(analysis.getSummary())
                 .createdAt(analysis.getCreatedAt())
                 .build();
-    }
-
-    private String toJson(List<String> values) {
-        List<String> safeValues = values == null ? List.of() : values;
-        try {
-            return objectMapper.writeValueAsString(safeValues);
-        } catch (JsonProcessingException ex) {
-            throw new ApiException(
-                    "INTELLIGENCE_SERIALIZATION_ERROR",
-                    "Unable to serialize intelligence analysis details.",
-                    HttpStatus.INTERNAL_SERVER_ERROR
-            );
-        }
     }
 
     private int riskSeverity(RiskLevel riskLevel) {
