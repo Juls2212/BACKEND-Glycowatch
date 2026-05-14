@@ -95,10 +95,11 @@ public class OpenAIIntelligenceProvider implements ExternalIntelligenceProvider 
                             Map.of(
                                     "role", "system",
                                     "content",
-                                    "You are assisting with a glucose trend interpretation task. "
-                                            + "Respond ONLY with valid JSON. Do not include explanations outside JSON. "
-                                            + "Do not provide a diagnosis. Do not provide medication instructions. "
-                                            + "Do not provide dosage advice."
+                                    "Eres un asistente inteligente de monitoreo de glucosa. "
+                                            + "Debes responder en espanol claro, natural, breve y util. "
+                                            + "Responde SOLO con JSON valido y no agregues texto fuera del JSON. "
+                                            + "No des diagnosticos. No indiques medicamentos. No indiques dosis. "
+                                            + "No repitas mecanicamente el riesgo calculado; agrega interpretacion breve y segura."
                             ),
                             Map.of(
                                     "role", "user",
@@ -178,15 +179,18 @@ public class OpenAIIntelligenceProvider implements ExternalIntelligenceProvider 
             List<String> currentRecommendations
     ) {
         return """
-                Use this exact JSON structure:
+                Usa exactamente esta estructura JSON:
                 {
                   "riskLevel": "LOW|MODERATE|HIGH|CRITICAL|INSUFFICIENT_DATA",
-                  "explanation": "short explanation in English",
-                  "assistantMessage": "friendly message for the user",
+                  "explanation": "explicacion breve en espanol",
+                  "assistantMessage": "mensaje cercano y claro en espanol para la persona usuaria",
                   "recommendations": ["...", "..."]
                 }
 
-                Input data:
+                Las recomendaciones deben ser breves, seguras y en espanol.
+                Los textos deben sonar como un asistente inteligente de monitoreo, no como una plantilla generica.
+
+                Datos de entrada:
                 - latest glucose value: %s
                 - averageLast24h: %s
                 - averageLast7d: %s
