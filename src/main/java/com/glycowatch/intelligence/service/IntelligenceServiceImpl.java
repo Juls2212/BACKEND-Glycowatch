@@ -164,13 +164,13 @@ public class IntelligenceServiceImpl implements IntelligenceService {
     }
 
     private IntelligenceSummaryResponse buildInsufficientDataResponse() {
-        String summary = "There is not enough analyzed data yet to generate an intelligence summary.";
+        String summary = "Todavia no hay suficientes datos analizados para generar un resumen inteligente.";
         return intelligenceSummaryMapper.toInsufficientDataResponse(
                 summary,
-                "Not enough data is available yet to provide a more detailed analysis.",
+                "Todavia no cuento con suficiente informacion para darte un analisis mas preciso.",
                 ruleBasedIntelligenceAnalyzer.determineAssistantMood(RiskLevel.INSUFFICIENT_DATA),
-                List.of("Insufficient analyzed data"),
-                List.of("Continue recording measurements to enable future analysis."),
+                List.of("Datos insuficientes para analizar tendencias recientes"),
+                List.of("Continua registrando mediciones para habilitar un analisis mas completo."),
                 DISCLAIMER,
                 Instant.now()
         );
@@ -178,15 +178,15 @@ public class IntelligenceServiceImpl implements IntelligenceService {
 
     private String buildAssistantMessage(RiskLevel riskLevel) {
         if (riskLevel == null) {
-            return "Continue consistent monitoring while more data is collected.";
+            return "Continua con el monitoreo mientras se recopilan mas datos.";
         }
 
         return switch (riskLevel) {
-            case LOW -> "Current data looks relatively stable. Continue consistent monitoring.";
-            case MODERATE -> "Some changes were detected. Keep monitoring your glucose closely.";
-            case HIGH -> "Recent data shows elevated attention signals. Consider checking your glucose again soon.";
-            case CRITICAL -> "Recent data shows strong warning signals. Recheck your glucose and stay attentive to how you feel.";
-            case INSUFFICIENT_DATA -> "Not enough data is available yet to provide a more detailed analysis.";
+            case LOW -> "Tus datos recientes se ven relativamente estables. Continua con tu seguimiento habitual.";
+            case MODERATE -> "Detecte algunos cambios que merecen atencion. Conviene seguir tu glucosa de cerca.";
+            case HIGH -> "Veo senales recientes que requieren mas atencion. Seria buena idea volver a medir pronto.";
+            case CRITICAL -> "Detecte senales importantes en tus datos recientes. Revisa nuevamente tu glucosa y mantente atento a como te sientes.";
+            case INSUFFICIENT_DATA -> "Todavia no hay suficientes datos para ofrecerte un analisis mas detallado.";
         };
     }
 
