@@ -286,33 +286,33 @@ public class RuleBasedIntelligenceAnalyzer {
         Double latestValue = metrics.getLatestValue();
         if (latestValue != null) {
             if (latestValue > highThreshold) {
-                factors.add("Latest glucose reading is above the configured high threshold");
+                factors.add("La ultima lectura de glucosa esta por encima del umbral alto configurado");
             } else if (latestValue < lowThreshold) {
-                factors.add("Latest glucose reading is below the configured low threshold");
+                factors.add("La ultima lectura de glucosa esta por debajo del umbral bajo configurado");
             }
         }
 
         Integer highReadingsCount = metrics.getHighReadingsCount();
         if (highReadingsCount != null && highReadingsCount >= 2) {
-            factors.add("Multiple high glucose readings detected");
+            factors.add("Se detectaron varias lecturas altas de glucosa");
         }
 
         Integer lowReadingsCount = metrics.getLowReadingsCount();
         if (lowReadingsCount != null && lowReadingsCount >= 1) {
-            factors.add("One or more low glucose readings detected");
+            factors.add("Se detecto al menos una lectura baja de glucosa");
         }
 
         if (trend == GlucoseTrend.RISING) {
-            factors.add("Recent trend is rising");
+            factors.add("La tendencia reciente va en aumento");
         } else if (trend == GlucoseTrend.FALLING) {
-            factors.add("Recent trend is falling");
+            factors.add("La tendencia reciente va en descenso");
         } else if (trend == GlucoseTrend.VARIABLE) {
-            factors.add("Recent glucose behavior is variable");
+            factors.add("El comportamiento reciente de la glucosa es variable");
         }
 
         Double variability = metrics.getVariability();
         if (variability != null && variability >= RISK_VARIABILITY_THRESHOLD) {
-            factors.add("High glucose variability detected");
+            factors.add("Se detecto una variabilidad alta en la glucosa");
         }
 
         return factors;
@@ -327,30 +327,30 @@ public class RuleBasedIntelligenceAnalyzer {
         List<String> recommendations = new ArrayList<>();
 
         if (metrics == null) {
-            recommendations.add("Continue consistent monitoring");
+            recommendations.add("Continua con un monitoreo constante");
             return recommendations;
         }
 
         Double latestValue = metrics.getLatestValue();
         if (latestValue != null && (latestValue > highThreshold || latestValue < lowThreshold)) {
-            recommendations.add("Measure glucose again in the next few hours");
+            recommendations.add("Vuelve a medir tu glucosa en las proximas horas");
         }
 
         if (trend == GlucoseTrend.RISING) {
-            recommendations.add("Observe whether values increase after meals");
+            recommendations.add("Observa si los valores aumentan despues de las comidas");
         } else if (trend == GlucoseTrend.FALLING) {
-            recommendations.add("Observe whether values decrease after physical activity or fasting periods");
+            recommendations.add("Observa si los valores disminuyen despues de actividad fisica o periodos de ayuno");
         } else if (trend == GlucoseTrend.VARIABLE) {
-            recommendations.add("Look for daily patterns that may explain changing glucose values");
+            recommendations.add("Busca patrones diarios que puedan explicar los cambios en la glucosa");
         }
 
         Double variability = metrics.getVariability();
         if (variability != null && variability >= RISK_VARIABILITY_THRESHOLD) {
-            recommendations.add("Continue consistent monitoring");
+            recommendations.add("Manten un seguimiento frecuente para confirmar la evolucion");
         }
 
         if (recommendations.isEmpty()) {
-            recommendations.add("Continue consistent monitoring");
+            recommendations.add("Continua con un monitoreo constante");
         }
 
         return recommendations;
@@ -367,19 +367,39 @@ public class RuleBasedIntelligenceAnalyzer {
     }
 
     private String buildSummary(RiskLevel riskLevel, GlucoseTrend trend, GlucoseAnalysisMetrics metrics) {
-        String riskText = riskLevel == null ? "unknown" : riskLevel.name().toLowerCase().replace('_', ' ');
-        String trendText = trend == null ? "unknown" : trend.name().toLowerCase().replace('_', ' ');
+        String riskText = riskLevel == null ? "desconocido" : toSpanishRiskText(riskLevel);
+        String trendText = trend == null ? "desconocida" : toSpanishTrendText(trend);
 
         if (metrics == null || metrics.getLatestValue() == null) {
-            return "Recent glucose data suggests a " + riskText + " risk pattern with a " + trendText + " trend.";
+            return "Los datos recientes sugieren un nivel de riesgo " + riskText + " con una tendencia " + trendText + ".";
         }
 
         return String.format(
-                "Recent glucose data suggests a %s risk pattern with a %s trend. The latest recorded value was %.1f mg/dL.",
+                "Los datos recientes sugieren un nivel de riesgo %s con una tendencia %s. La ultima lectura registrada fue de %.1f mg/dL.",
                 riskText,
                 trendText,
                 metrics.getLatestValue()
         );
+    }
+
+    private String toSpanishRiskText(RiskLevel riskLevel) {
+        return switch (riskLevel) {
+            case LOW -> "bajo";
+            case MODERATE -> "moderado";
+            case HIGH -> "alto";
+            case CRITICAL -> "critico";
+            case INSUFFICIENT_DATA -> "insuficiente";
+        };
+    }
+
+    private String toSpanishTrendText(GlucoseTrend trend) {
+        return switch (trend) {
+            case STABLE -> "estable";
+            case RISING -> "en aumento";
+            case FALLING -> "en descenso";
+            case VARIABLE -> "variable";
+            case UNKNOWN -> "no concluyente";
+        };
     }
 
     private Double variabilityOf(List<GlucoseMeasurementEntity> measurements) {
