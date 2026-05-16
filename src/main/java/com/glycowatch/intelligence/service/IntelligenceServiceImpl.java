@@ -5,7 +5,7 @@ import com.glycowatch.auth.repository.UserRepository;
 import com.glycowatch.common.exception.ApiException;
 import com.glycowatch.intelligence.dto.IntelligenceHistoryItemResponse;
 import com.glycowatch.intelligence.dto.IntelligenceSummaryResponse;
-import com.glycowatch.intelligence.integration.GeminiAnalysisResult;
+import com.glycowatch.intelligence.integration.ExternalAIAnalysisResult;
 import com.glycowatch.intelligence.model.AgreementStatus;
 import com.glycowatch.intelligence.model.IntelligenceAnalysis;
 import com.glycowatch.intelligence.model.AssistantMood;
@@ -72,7 +72,7 @@ public class IntelligenceServiceImpl implements IntelligenceService {
         List<String> recommendations = ruleBasedAnalysis.recommendations();
         IntelligenceConfidence confidence = ruleBasedAnalysis.confidence();
         String summary = ruleBasedAnalysis.summary();
-        HybridAnalysis hybridAnalysis = mergeGeminiAnalysis(
+        HybridAnalysis hybridAnalysis = mergeExternalAIAnalysis(
                 ruleBasedAnalysis.metrics(),
                 trend,
                 riskLevel,
@@ -89,7 +89,7 @@ public class IntelligenceServiceImpl implements IntelligenceService {
                 confidence,
                 assistantMood,
                 summary,
-                hybridAnalysis.geminiRiskLevel(),
+                hybridAnalysis.externalAiRiskLevel(),
                 hybridAnalysis.finalRiskLevel(),
                 hybridAnalysis.agreementStatus(),
                 hybridAnalysis.aiExplanation(),
@@ -190,7 +190,7 @@ public class IntelligenceServiceImpl implements IntelligenceService {
         };
     }
 
-    private HybridAnalysis mergeGeminiAnalysis(
+    private HybridAnalysis mergeExternalAIAnalysis(
             GlucoseAnalysisMetrics metrics,
             GlucoseTrend trend,
             RiskLevel ruleBasedRiskLevel,
@@ -202,7 +202,7 @@ public class IntelligenceServiceImpl implements IntelligenceService {
             return buildGeminiUnavailable(ruleBasedRiskLevel, currentRecommendations, summary);
         }
 
-        java.util.Optional<GeminiAnalysisResult> geminiResultOptional = externalIntelligenceProvider.generateGlucoseAnalysis(
+        java.util.Optional<ExternalAIAnalysisResult> externalAiResultOptional = externalIntelligenceProvider.generateGlucoseAnalysis(
                 metrics,
                 trend,
                 ruleBasedRiskLevel,
@@ -210,30 +210,30 @@ public class IntelligenceServiceImpl implements IntelligenceService {
                 currentRecommendations
         );
 
-        if (geminiResultOptional.isEmpty()) {
+        if (externalAiResultOptional.isEmpty()) {
             return buildGeminiUnavailable(ruleBasedRiskLevel, currentRecommendations, summary);
         }
 
-        GeminiAnalysisResult geminiResult = geminiResultOptional.get();
-        RiskLevel geminiRiskLevel;
+        ExternalAIAnalysisResult externalAiResult = externalAiResultOptional.get();
+        RiskLevel externalAiRiskLevel;
         try {
-            geminiRiskLevel = RiskLevel.valueOf(geminiResult.getRiskLevel().trim());
+            externalAiRiskLevel = RiskLevel.valueOf(externalAiResult.getRiskLevel().trim());
         } catch (IllegalArgumentException ex) {
             return buildGeminiUnavailable(ruleBasedRiskLevel, currentRecommendations, summary);
         }
 
-        RiskLevel finalRiskLevel = moreConservativeRisk(ruleBasedRiskLevel, geminiRiskLevel);
-        AgreementStatus agreementStatus = determineAgreementStatus(ruleBasedRiskLevel, geminiRiskLevel);
-        List<String> finalRecommendations = geminiResult.getRecommendations() != null && !geminiResult.getRecommendations().isEmpty()
-                ? geminiResult.getRecommendations()
+        RiskLevel finalRiskLevel = moreConservativeRisk(ruleBasedRiskLevel, externalAiRiskLevel);
+        AgreementStatus agreementStatus = determineAgreementStatus(ruleBasedRiskLevel, externalAiRiskLevel);
+        List<String> finalRecommendations = externalAiResult.getRecommendations() != null && !externalAiResult.getRecommendations().isEmpty()
+                ? externalAiResult.getRecommendations()
                 : currentRecommendations;
 
         return new HybridAnalysis(
-                geminiRiskLevel.name(),
+                externalAiRiskLevel.name(),
                 finalRiskLevel,
                 agreementStatus,
-                geminiResult.getExplanation(),
-                geminiResult.getAssistantMessage(),
+                externalAiResult.getExplanation(),
+                externalAiResult.getAssistantMessage(),
                 Boolean.TRUE,
                 finalRecommendations
         );
@@ -305,7 +305,7 @@ public class IntelligenceServiceImpl implements IntelligenceService {
     }
 
     private record HybridAnalysis(
-            String geminiRiskLevel,
+            String externalAiRiskLevel,
             RiskLevel finalRiskLevel,
             AgreementStatus agreementStatus,
             String aiExplanation,
