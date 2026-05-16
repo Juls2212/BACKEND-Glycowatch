@@ -63,7 +63,7 @@ public class IntelligenceServiceImpl implements IntelligenceService {
 
         consumePreparedInputs(user, thresholds, last7DaysMeasurements, last24HoursMeasurements, ruleBasedAnalysis);
 
-        if (!ruleBasedAnalysis.hasSufficientData()) {
+        if (!ruleBasedAnalysis.hasMinimumData()) {
             return buildInsufficientDataResponse();
         }
 
