@@ -1,7 +1,7 @@
 package com.glycowatch.intelligence.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.glycowatch.intelligence.integration.GeminiAnalysisResult;
+import com.glycowatch.intelligence.integration.ExternalAIAnalysisResult;
 import com.glycowatch.intelligence.model.GlucoseAnalysisMetrics;
 import com.glycowatch.intelligence.model.GlucoseTrend;
 import com.glycowatch.intelligence.model.RiskLevel;
@@ -43,7 +43,7 @@ public class OpenAIIntelligenceProvider implements ExternalIntelligenceProvider 
     }
 
     @Override
-    public Optional<GeminiAnalysisResult> generateGlucoseAnalysis(
+    public Optional<ExternalAIAnalysisResult> generateGlucoseAnalysis(
             GlucoseAnalysisMetrics metrics,
             GlucoseTrend trend,
             RiskLevel ruleBasedRiskLevel,
@@ -51,7 +51,7 @@ public class OpenAIIntelligenceProvider implements ExternalIntelligenceProvider 
             List<String> currentRecommendations
     ) {
         if (hasOpenAiApiKey()) {
-            Optional<GeminiAnalysisResult> openAiResult = generateWithOpenAi(
+            Optional<ExternalAIAnalysisResult> openAiResult = generateWithOpenAi(
                     metrics,
                     trend,
                     ruleBasedRiskLevel,
@@ -72,7 +72,7 @@ public class OpenAIIntelligenceProvider implements ExternalIntelligenceProvider 
         );
     }
 
-    private Optional<GeminiAnalysisResult> generateWithOpenAi(
+    private Optional<ExternalAIAnalysisResult> generateWithOpenAi(
             GlucoseAnalysisMetrics metrics,
             GlucoseTrend trend,
             RiskLevel ruleBasedRiskLevel,
@@ -137,7 +137,7 @@ public class OpenAIIntelligenceProvider implements ExternalIntelligenceProvider 
         }
     }
 
-    private Optional<GeminiAnalysisResult> extractResult(OpenAiChatCompletionResponse response) {
+    private Optional<ExternalAIAnalysisResult> extractResult(OpenAiChatCompletionResponse response) {
         if (response.choices() == null || response.choices().isEmpty()) {
             return Optional.empty();
         }
@@ -148,7 +148,7 @@ public class OpenAIIntelligenceProvider implements ExternalIntelligenceProvider 
         }
 
         try {
-            GeminiAnalysisResult result = objectMapper.readValue(choice.message().content(), GeminiAnalysisResult.class);
+            ExternalAIAnalysisResult result = objectMapper.readValue(choice.message().content(), ExternalAIAnalysisResult.class);
             return isValidResult(result) ? Optional.of(result) : Optional.empty();
         } catch (Exception ex) {
             log.warn("OpenAI JSON parsing failed: {}", ex.getMessage());
@@ -156,7 +156,7 @@ public class OpenAIIntelligenceProvider implements ExternalIntelligenceProvider 
         }
     }
 
-    private boolean isValidResult(GeminiAnalysisResult result) {
+    private boolean isValidResult(ExternalAIAnalysisResult result) {
         if (result == null
                 || !StringUtils.hasText(result.getRiskLevel())
                 || !StringUtils.hasText(result.getExplanation())
