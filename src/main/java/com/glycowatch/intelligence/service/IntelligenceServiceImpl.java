@@ -71,14 +71,14 @@ public class IntelligenceServiceImpl implements IntelligenceService {
         List<String> detectedFactors = ruleBasedAnalysis.detectedFactors();
         List<String> recommendations = ruleBasedAnalysis.recommendations();
         IntelligenceConfidence confidence = ruleBasedAnalysis.confidence();
-        String summary = ruleBasedAnalysis.summary();
+        String ruleBasedSummary = ruleBasedAnalysis.summary();
         HybridAnalysis hybridAnalysis = mergeExternalAIAnalysis(
                 ruleBasedAnalysis.metrics(),
                 trend,
                 riskLevel,
                 detectedFactors,
                 recommendations,
-                summary
+                ruleBasedSummary
         );
         AssistantMood assistantMood = ruleBasedIntelligenceAnalyzer.determineAssistantMood(hybridAnalysis.finalRiskLevel());
         Instant generatedAt = Instant.now();
@@ -88,7 +88,7 @@ public class IntelligenceServiceImpl implements IntelligenceService {
                 trend,
                 confidence,
                 assistantMood,
-                summary,
+                hybridAnalysis.summary(),
                 hybridAnalysis.externalAiRiskLevel(),
                 hybridAnalysis.finalRiskLevel(),
                 hybridAnalysis.agreementStatus(),
@@ -227,13 +227,24 @@ public class IntelligenceServiceImpl implements IntelligenceService {
         List<String> finalRecommendations = externalAiResult.getRecommendations() != null && !externalAiResult.getRecommendations().isEmpty()
                 ? externalAiResult.getRecommendations()
                 : currentRecommendations;
+        String aiExplanation = reinforceSafetyInExplanation(
+                externalAiResult.getExplanation(),
+                ruleBasedRiskLevel,
+                externalAiRiskLevel
+        );
+        String assistantMessage = reinforceSafetyInAssistantMessage(
+                externalAiResult.getAssistantMessage(),
+                ruleBasedRiskLevel,
+                externalAiRiskLevel
+        );
 
         return new HybridAnalysis(
                 externalAiRiskLevel.name(),
                 finalRiskLevel,
                 agreementStatus,
-                externalAiResult.getExplanation(),
-                externalAiResult.getAssistantMessage(),
+                aiExplanation,
+                aiExplanation,
+                assistantMessage,
                 Boolean.TRUE,
                 finalRecommendations
         );
@@ -248,6 +259,7 @@ public class IntelligenceServiceImpl implements IntelligenceService {
                 null,
                 ruleBasedRiskLevel,
                 AgreementStatus.GEMINI_UNAVAILABLE,
+                summary,
                 summary,
                 buildAssistantMessage(ruleBasedRiskLevel),
                 Boolean.FALSE,
@@ -275,6 +287,51 @@ public class IntelligenceServiceImpl implements IntelligenceService {
             return left;
         }
         return riskSeverity(left) >= riskSeverity(right) ? left : right;
+    }
+
+    private String reinforceSafetyInExplanation(
+            String aiExplanation,
+            RiskLevel ruleBasedRiskLevel,
+            RiskLevel externalAiRiskLevel
+    ) {
+        if (aiExplanation == null || !needsSafetyReinforcement(ruleBasedRiskLevel, externalAiRiskLevel)) {
+            return aiExplanation;
+        }
+
+        return aiExplanation + switch (ruleBasedRiskLevel) {
+            case CRITICAL ->
+                    " Por seguridad, tus datos recientes siguen mostrando senales de riesgo critico y requieren vigilancia muy estrecha.";
+            case HIGH ->
+                    " Por seguridad, tus datos recientes mantienen senales de riesgo alto y conviene un seguimiento cercano.";
+            default -> "";
+        };
+    }
+
+    private String reinforceSafetyInAssistantMessage(
+            String assistantMessage,
+            RiskLevel ruleBasedRiskLevel,
+            RiskLevel externalAiRiskLevel
+    ) {
+        if (assistantMessage == null || !needsSafetyReinforcement(ruleBasedRiskLevel, externalAiRiskLevel)) {
+            return assistantMessage;
+        }
+
+        return assistantMessage + switch (ruleBasedRiskLevel) {
+            case CRITICAL ->
+                    " Como medida de seguridad, vuelve a medir pronto y mantente muy atento a como te sientes.";
+            case HIGH ->
+                    " Como medida de seguridad, conviene repetir la medicion pronto y observar la tendencia.";
+            default -> "";
+        };
+    }
+
+    private boolean needsSafetyReinforcement(RiskLevel ruleBasedRiskLevel, RiskLevel externalAiRiskLevel) {
+        if (ruleBasedRiskLevel == null || externalAiRiskLevel == null) {
+            return false;
+        }
+
+        return riskSeverity(ruleBasedRiskLevel) > riskSeverity(externalAiRiskLevel)
+                && riskSeverity(ruleBasedRiskLevel) >= riskSeverity(RiskLevel.HIGH);
     }
 
     private IntelligenceHistoryItemResponse toHistoryItemResponse(IntelligenceAnalysis analysis) {
@@ -308,6 +365,7 @@ public class IntelligenceServiceImpl implements IntelligenceService {
             String externalAiRiskLevel,
             RiskLevel finalRiskLevel,
             AgreementStatus agreementStatus,
+            String summary,
             String aiExplanation,
             String assistantMessage,
             Boolean geminiAvailable,
