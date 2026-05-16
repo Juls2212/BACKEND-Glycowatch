@@ -44,6 +44,7 @@ public class IntelligenceServiceImpl implements IntelligenceService {
     private final IntelligenceSummaryMapper intelligenceSummaryMapper;
     private final ExternalIntelligenceProvider externalIntelligenceProvider;
     private final IntelligenceAnalysisPersistenceService intelligenceAnalysisPersistenceService;
+    private final HybridRiskResolver hybridRiskResolver;
 
     @Override
     @Transactional
@@ -76,6 +77,7 @@ public class IntelligenceServiceImpl implements IntelligenceService {
                 ruleBasedAnalysis.metrics(),
                 trend,
                 riskLevel,
+                confidence,
                 detectedFactors,
                 recommendations,
                 ruleBasedSummary
@@ -194,12 +196,13 @@ public class IntelligenceServiceImpl implements IntelligenceService {
             GlucoseAnalysisMetrics metrics,
             GlucoseTrend trend,
             RiskLevel ruleBasedRiskLevel,
+            IntelligenceConfidence confidence,
             List<String> detectedFactors,
             List<String> currentRecommendations,
             String summary
     ) {
         if (!externalIntelligenceProvider.isAvailable()) {
-            return buildGeminiUnavailable(ruleBasedRiskLevel, currentRecommendations, summary);
+            return buildExternalAIUnavailable(ruleBasedRiskLevel, confidence, currentRecommendations, summary);
         }
 
         java.util.Optional<ExternalAIAnalysisResult> externalAiResultOptional = externalIntelligenceProvider.generateGlucoseAnalysis(
@@ -211,7 +214,7 @@ public class IntelligenceServiceImpl implements IntelligenceService {
         );
 
         if (externalAiResultOptional.isEmpty()) {
-            return buildGeminiUnavailable(ruleBasedRiskLevel, currentRecommendations, summary);
+            return buildExternalAIUnavailable(ruleBasedRiskLevel, confidence, currentRecommendations, summary);
         }
 
         ExternalAIAnalysisResult externalAiResult = externalAiResultOptional.get();
@@ -219,11 +222,14 @@ public class IntelligenceServiceImpl implements IntelligenceService {
         try {
             externalAiRiskLevel = RiskLevel.valueOf(externalAiResult.getRiskLevel().trim());
         } catch (IllegalArgumentException ex) {
-            return buildGeminiUnavailable(ruleBasedRiskLevel, currentRecommendations, summary);
+            return buildExternalAIUnavailable(ruleBasedRiskLevel, confidence, currentRecommendations, summary);
         }
 
-        RiskLevel finalRiskLevel = moreConservativeRisk(ruleBasedRiskLevel, externalAiRiskLevel);
-        AgreementStatus agreementStatus = determineAgreementStatus(ruleBasedRiskLevel, externalAiRiskLevel);
+        HybridRiskResolver.Resolution resolution = hybridRiskResolver.resolve(
+                ruleBasedRiskLevel,
+                externalAiRiskLevel,
+                confidence
+        );
         List<String> finalRecommendations = externalAiResult.getRecommendations() != null && !externalAiResult.getRecommendations().isEmpty()
                 ? externalAiResult.getRecommendations()
                 : currentRecommendations;
@@ -240,8 +246,9 @@ public class IntelligenceServiceImpl implements IntelligenceService {
 
         return new HybridAnalysis(
                 externalAiRiskLevel.name(),
-                finalRiskLevel,
-                agreementStatus,
+                resolution.finalRiskLevel(),
+                resolution.agreementStatus(),
+                resolution.confidence(),
                 aiExplanation,
                 aiExplanation,
                 assistantMessage,
@@ -250,43 +257,24 @@ public class IntelligenceServiceImpl implements IntelligenceService {
         );
     }
 
-    private HybridAnalysis buildGeminiUnavailable(
+    private HybridAnalysis buildExternalAIUnavailable(
             RiskLevel ruleBasedRiskLevel,
+            IntelligenceConfidence confidence,
             List<String> currentRecommendations,
             String summary
     ) {
+        HybridRiskResolver.Resolution resolution = hybridRiskResolver.resolve(ruleBasedRiskLevel, null, confidence);
         return new HybridAnalysis(
                 null,
-                ruleBasedRiskLevel,
-                AgreementStatus.GEMINI_UNAVAILABLE,
+                resolution.finalRiskLevel(),
+                resolution.agreementStatus(),
+                resolution.confidence(),
                 summary,
                 summary,
                 buildAssistantMessage(ruleBasedRiskLevel),
                 Boolean.FALSE,
                 currentRecommendations
         );
-    }
-
-    private AgreementStatus determineAgreementStatus(RiskLevel ruleBasedRiskLevel, RiskLevel geminiRiskLevel) {
-        if (ruleBasedRiskLevel == null || geminiRiskLevel == null) {
-            return AgreementStatus.GEMINI_UNAVAILABLE;
-        }
-        if (ruleBasedRiskLevel == geminiRiskLevel) {
-            return AgreementStatus.FULL_AGREEMENT;
-        }
-
-        int difference = Math.abs(riskSeverity(ruleBasedRiskLevel) - riskSeverity(geminiRiskLevel));
-        return difference == 1 ? AgreementStatus.PARTIAL_AGREEMENT : AgreementStatus.DISAGREEMENT;
-    }
-
-    private RiskLevel moreConservativeRisk(RiskLevel left, RiskLevel right) {
-        if (left == null) {
-            return right;
-        }
-        if (right == null) {
-            return left;
-        }
-        return riskSeverity(left) >= riskSeverity(right) ? left : right;
     }
 
     private String reinforceSafetyInExplanation(
@@ -330,8 +318,18 @@ public class IntelligenceServiceImpl implements IntelligenceService {
             return false;
         }
 
-        return riskSeverity(ruleBasedRiskLevel) > riskSeverity(externalAiRiskLevel)
-                && riskSeverity(ruleBasedRiskLevel) >= riskSeverity(RiskLevel.HIGH);
+        return localRiskSeverity(ruleBasedRiskLevel) > localRiskSeverity(externalAiRiskLevel)
+                && localRiskSeverity(ruleBasedRiskLevel) >= localRiskSeverity(RiskLevel.HIGH);
+    }
+
+    private int localRiskSeverity(RiskLevel riskLevel) {
+        return switch (riskLevel) {
+            case LOW -> 1;
+            case MODERATE -> 2;
+            case HIGH -> 3;
+            case CRITICAL -> 4;
+            case INSUFFICIENT_DATA -> 0;
+        };
     }
 
     private IntelligenceHistoryItemResponse toHistoryItemResponse(IntelligenceAnalysis analysis) {
@@ -345,16 +343,6 @@ public class IntelligenceServiceImpl implements IntelligenceService {
                 .build();
     }
 
-    private int riskSeverity(RiskLevel riskLevel) {
-        return switch (riskLevel) {
-            case LOW -> 1;
-            case MODERATE -> 2;
-            case HIGH -> 3;
-            case CRITICAL -> 4;
-            case INSUFFICIENT_DATA -> 0;
-        };
-    }
-
     private record ThresholdWindow(
             BigDecimal hypoglycemiaThreshold,
             BigDecimal hyperglycemiaThreshold
@@ -365,6 +353,7 @@ public class IntelligenceServiceImpl implements IntelligenceService {
             String externalAiRiskLevel,
             RiskLevel finalRiskLevel,
             AgreementStatus agreementStatus,
+            IntelligenceConfidence confidence,
             String summary,
             String aiExplanation,
             String assistantMessage,
