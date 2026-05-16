@@ -97,12 +97,15 @@ public class OpenAIIntelligenceProvider implements ExternalIntelligenceProvider 
                                     "content",
                                     "Eres el asistente inteligente de GlycoWatch para monitoreo de glucosa. "
                                             + "Tu trabajo es interpretar patrones recientes de glucosa con lenguaje claro, natural, humano y completamente en espanol. "
-                                            + "Debes sonar como un asistente atento, util y cercano, no como un reporte tecnico ni como una plantilla automatica. "
-                                            + "Resume el comportamiento reciente, destaca cambios importantes y explica tendencias de forma breve y comprensible. "
-                                            + "Aporta valor interpretativo; no te limites a repetir el riesgo calculado por reglas. "
+                                            + "Debes sonar como un asistente atento, util, profesional y cercano, no como un reporte tecnico ni como una plantilla automatica. "
+                                            + "Debes identificar el hallazgo mas importante, explicar que significan la tendencia, la variabilidad y las lecturas recientes, "
+                                            + "y resumir el comportamiento reciente con criterio clinico general pero sin diagnosticar. "
+                                            + "Aporta valor interpretativo; no te limites a repetir el riesgo calculado por reglas ni a enumerar datos sin contexto. "
+                                            + "Cuando existan senales altas o criticas, mantente conservador y refuerza el seguimiento cercano. "
                                             + "Responde SOLO con JSON valido y no agregues texto fuera del JSON. "
                                             + "No des diagnosticos. No indiques medicamentos. No indiques dosis. "
-                                            + "Las recomendaciones deben ser breves, seguras, practicas y apropiadas para tarjetas de interfaz."
+                                            + "Las recomendaciones deben ser breves, seguras, practicas y apropiadas para tarjetas de interfaz. "
+                                            + "Evita lenguaje alarmista innecesario y evita frases vacias o genericas."
                             ),
                             Map.of(
                                     "role", "user",
@@ -193,34 +196,50 @@ public class OpenAIIntelligenceProvider implements ExternalIntelligenceProvider 
                 Reglas de estilo:
                 - Todo el contenido debe estar en espanol natural.
                 - Explica el comportamiento reciente de la glucosa, no solo el nivel de riesgo.
+                - Destaca primero el hallazgo mas importante.
                 - Si hay tendencia o variabilidad, interpretala con lenguaje humano y claro.
+                - Si las lecturas recientes parecen estables, dilo de forma breve y tranquilizadora sin exagerar.
+                - Si hay senales de aumento, descenso brusco o variabilidad alta, explicalo como un patron observado.
                 - Evita frases roboticas, literales o repetitivas.
                 - No copies textualmente los factores ni las recomendaciones actuales; reescribelos con mejor contexto si ayuda.
                 - Las recomendaciones deben ser concretas, breves y seguras.
+                - No uses lenguaje diagnostico.
+                - No menciones medicamentos, insulina ni dosis.
                 - El assistantMessage debe sentirse como la voz principal del asistente.
 
                 Datos de entrada:
                 - latest glucose value: %s
                 - averageLast24h: %s
                 - averageLast7d: %s
+                - minLast7d: %s
+                - maxLast7d: %s
                 - highReadingsCount: %s
                 - lowReadingsCount: %s
+                - countLast24h: %s
+                - countLast7d: %s
                 - variability: %s
                 - trend: %s
+                - recentWindow: ultimas 24 horas
+                - trendWindow: ultimos 7 dias
                 - ruleBasedRiskLevel: %s
                 - detectedFactors: %s
                 - currentRecommendations: %s
                 
                 Objetivo:
-                - "explanation" debe resumir lo mas importante del comportamiento reciente.
-                - "assistantMessage" debe sonar como una orientacion breve del asistente.
+                - "explanation" debe resumir lo mas importante del comportamiento reciente y explicar el patron observado.
+                - "assistantMessage" debe sonar como una orientacion breve, humana y util del asistente.
                 - "recommendations" debe contener 2 o 3 sugerencias cortas, utiles y seguras.
+                - Si detectedFactors ya muestra hallazgos importantes, usalos como contexto pero redactalos de manera mas natural.
                 """.formatted(
                 valueOrNull(metrics.getLatestValue()),
                 valueOrNull(metrics.getAverageLast24h()),
                 valueOrNull(metrics.getAverageLast7d()),
+                valueOrNull(metrics.getMinLast7d()),
+                valueOrNull(metrics.getMaxLast7d()),
                 valueOrNull(metrics.getHighReadingsCount()),
                 valueOrNull(metrics.getLowReadingsCount()),
+                valueOrNull(metrics.getCountLast24h()),
+                valueOrNull(metrics.getCountLast7d()),
                 valueOrNull(metrics.getVariability()),
                 trend.name(),
                 ruleBasedRiskLevel.name(),
