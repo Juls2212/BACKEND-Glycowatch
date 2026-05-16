@@ -187,10 +187,16 @@ public class GeminiClient {
                 - latest glucose value: %s
                 - averageLast24h: %s
                 - averageLast7d: %s
+                - minLast7d: %s
+                - maxLast7d: %s
                 - highReadingsCount: %s
                 - lowReadingsCount: %s
+                - countLast24h: %s
+                - countLast7d: %s
                 - variability: %s
                 - trend: %s
+                - recentWindow: ultimas 24 horas
+                - trendWindow: ultimos 7 dias
                 - ruleBasedRiskLevel: %s
                 - detectedFactors: %s
                 - currentRecommendations: %s
@@ -198,8 +204,12 @@ public class GeminiClient {
                 valueOrNull(metrics.getLatestValue()),
                 valueOrNull(metrics.getAverageLast24h()),
                 valueOrNull(metrics.getAverageLast7d()),
+                valueOrNull(metrics.getMinLast7d()),
+                valueOrNull(metrics.getMaxLast7d()),
                 valueOrNull(metrics.getHighReadingsCount()),
                 valueOrNull(metrics.getLowReadingsCount()),
+                valueOrNull(metrics.getCountLast24h()),
+                valueOrNull(metrics.getCountLast7d()),
                 valueOrNull(metrics.getVariability()),
                 trend.name(),
                 ruleBasedRiskLevel.name(),
