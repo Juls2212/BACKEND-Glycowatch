@@ -1,6 +1,6 @@
 package com.glycowatch.intelligence.service;
 
-import com.glycowatch.intelligence.integration.GeminiAnalysisResult;
+import com.glycowatch.intelligence.integration.ExternalAIAnalysisResult;
 import com.glycowatch.intelligence.integration.GeminiClient;
 import com.glycowatch.intelligence.model.GlucoseAnalysisMetrics;
 import com.glycowatch.intelligence.model.GlucoseTrend;
@@ -22,7 +22,7 @@ public class GeminiIntelligenceProvider implements ExternalIntelligenceProvider 
     }
 
     @Override
-    public Optional<GeminiAnalysisResult> generateGlucoseAnalysis(
+    public Optional<ExternalAIAnalysisResult> generateGlucoseAnalysis(
             GlucoseAnalysisMetrics metrics,
             GlucoseTrend trend,
             RiskLevel ruleBasedRiskLevel,
