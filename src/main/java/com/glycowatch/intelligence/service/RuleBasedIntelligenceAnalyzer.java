@@ -374,11 +374,22 @@ public class RuleBasedIntelligenceAnalyzer {
             return "Los datos recientes sugieren un nivel de riesgo " + riskText + " con una tendencia " + trendText + ".";
         }
 
+        if (metrics.getAverageLast24h() == null || metrics.getMinLast7d() == null || metrics.getMaxLast7d() == null) {
+            return String.format(
+                    "Los datos recientes sugieren un nivel de riesgo %s con una tendencia %s. La ultima lectura registrada fue de %.1f mg/dL.",
+                    riskText,
+                    trendText,
+                    metrics.getLatestValue()
+            );
+        }
+
         return String.format(
-                "Los datos recientes sugieren un nivel de riesgo %s con una tendencia %s. La ultima lectura registrada fue de %.1f mg/dL.",
-                riskText,
+                "En las ultimas 24 horas el promedio fue de %.1f mg/dL. En los ultimos 7 dias los valores se movieron entre %.1f y %.1f mg/dL, con una tendencia %s y un riesgo %s.",
+                metrics.getAverageLast24h(),
+                metrics.getMinLast7d(),
+                metrics.getMaxLast7d(),
                 trendText,
-                metrics.getLatestValue()
+                riskText
         );
     }
 
