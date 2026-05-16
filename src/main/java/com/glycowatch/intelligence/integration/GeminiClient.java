@@ -85,7 +85,7 @@ public class GeminiClient {
         }
     }
 
-    public Optional<GeminiAnalysisResult> generateGlucoseAnalysis(
+    public Optional<ExternalAIAnalysisResult> generateGlucoseAnalysis(
             GlucoseAnalysisMetrics metrics,
             GlucoseTrend trend,
             RiskLevel ruleBasedRiskLevel,
@@ -127,9 +127,9 @@ public class GeminiClient {
         return StringUtils.hasText(normalized) ? Optional.of(normalized) : Optional.empty();
     }
 
-    private Optional<GeminiAnalysisResult> parseAnalysisResult(String json) {
+    private Optional<ExternalAIAnalysisResult> parseAnalysisResult(String json) {
         try {
-            GeminiAnalysisResult result = objectMapper.readValue(json, GeminiAnalysisResult.class);
+            ExternalAIAnalysisResult result = objectMapper.readValue(json, ExternalAIAnalysisResult.class);
             if (!isValidResult(result)) {
                 return Optional.empty();
             }
@@ -140,7 +140,7 @@ public class GeminiClient {
         }
     }
 
-    private boolean isValidResult(GeminiAnalysisResult result) {
+    private boolean isValidResult(ExternalAIAnalysisResult result) {
         if (result == null
                 || !StringUtils.hasText(result.getRiskLevel())
                 || !StringUtils.hasText(result.getExplanation())
