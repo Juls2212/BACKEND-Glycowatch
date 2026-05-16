@@ -1,6 +1,6 @@
 package com.glycowatch.intelligence.service;
 
-import com.glycowatch.intelligence.integration.GeminiAnalysisResult;
+import com.glycowatch.intelligence.integration.ExternalAIAnalysisResult;
 import com.glycowatch.intelligence.model.GlucoseAnalysisMetrics;
 import com.glycowatch.intelligence.model.GlucoseTrend;
 import com.glycowatch.intelligence.model.RiskLevel;
@@ -11,7 +11,7 @@ public interface ExternalIntelligenceProvider {
 
     boolean isAvailable();
 
-    Optional<GeminiAnalysisResult> generateGlucoseAnalysis(
+    Optional<ExternalAIAnalysisResult> generateGlucoseAnalysis(
             GlucoseAnalysisMetrics metrics,
             GlucoseTrend trend,
             RiskLevel ruleBasedRiskLevel,
