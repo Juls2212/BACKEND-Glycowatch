@@ -283,6 +283,11 @@ public class RuleBasedIntelligenceAnalyzer {
             return factors;
         }
 
+        Integer countLast7d = metrics.getCountLast7d();
+        if (countLast7d != null && countLast7d < 3) {
+            factors.add("El analisis actual se basa en pocas mediciones recientes");
+        }
+
         Double latestValue = metrics.getLatestValue();
         if (latestValue != null) {
             if (latestValue > highThreshold) {
@@ -331,6 +336,11 @@ public class RuleBasedIntelligenceAnalyzer {
             return recommendations;
         }
 
+        Integer countLast7d = metrics.getCountLast7d();
+        if (countLast7d != null && countLast7d < 3) {
+            recommendations.add("Sigue registrando mediciones para mejorar la precision del analisis");
+        }
+
         Double latestValue = metrics.getLatestValue();
         if (latestValue != null && (latestValue > highThreshold || latestValue < lowThreshold)) {
             recommendations.add("Vuelve a medir tu glucosa en las proximas horas");
@@ -374,10 +384,22 @@ public class RuleBasedIntelligenceAnalyzer {
             return "Los datos recientes sugieren un nivel de riesgo " + riskText + " con una tendencia " + trendText + ".";
         }
 
+        Integer countLast7d = metrics.getCountLast7d();
+        if (countLast7d != null && countLast7d < 3) {
+            return String.format(
+                    "Este es un analisis inicial basado en %d medicion%s reciente%s. La ultima lectura fue de %.1f mg/dL y, por ahora, el riesgo estimado es %s.",
+                    countLast7d,
+                    countLast7d == 1 ? "" : "es",
+                    countLast7d == 1 ? "" : "s",
+                    metrics.getLatestValue(),
+                    riskText
+            );
+        }
+
         if (metrics.getAverageLast24h() == null || metrics.getMinLast7d() == null || metrics.getMaxLast7d() == null) {
             return String.format(
-                    "Los datos recientes sugieren un nivel de riesgo %s con una tendencia %s. La ultima lectura registrada fue de %.1f mg/dL.",
-                    riskText,
+                "Los datos recientes sugieren un nivel de riesgo %s con una tendencia %s. La ultima lectura registrada fue de %.1f mg/dL.",
+                riskText,
                     trendText,
                     metrics.getLatestValue()
             );
@@ -429,8 +451,8 @@ public class RuleBasedIntelligenceAnalyzer {
             List<String> recommendations,
             String summary
     ) {
-        public boolean hasSufficientData() {
-            return metrics != null && metrics.getCountLast7d() != null && metrics.getCountLast7d() >= 3;
+        public boolean hasMinimumData() {
+            return metrics != null && metrics.getCountLast7d() != null && metrics.getCountLast7d() >= 1;
         }
     }
 }
