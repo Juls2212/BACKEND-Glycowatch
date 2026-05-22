@@ -43,6 +43,7 @@ public class SecurityConfiguration {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(
+                                "/auth/**",
                                 "/api/v1/auth/**",
                                 "/api/v1/iot/**",
                                 "/v3/api-docs/**",
@@ -79,11 +80,13 @@ public class SecurityConfiguration {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
+
         configuration.setAllowedOrigins(
                 Arrays.stream(allowedOrigins.split(","))
                         .map(String::trim)
                         .toList()
         );
+
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
         configuration.setExposedHeaders(List.of("Authorization"));
@@ -91,6 +94,7 @@ public class SecurityConfiguration {
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
+
         return source;
     }
 }
