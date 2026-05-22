@@ -15,4 +15,4 @@ COPY --from=build /app/target/*.jar app.jar
 
 EXPOSE 8081
 
-CMD ["java", "-jar", "app.jar"]
+CMD ["sh", "-c", "java -Dserver.address=0.0.0.0 -Dserver.port=${PORT:-8081} -jar app.jar"]
