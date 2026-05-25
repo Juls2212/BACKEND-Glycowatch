@@ -54,7 +54,7 @@ public class AuthServiceImpl implements AuthService {
         Instant now = Instant.now();
         UserEntity user = UserEntity.builder()
                 .email(email)
-                .passwordHash(passwordEncoder.encode(request.password()))
+                .passwordHash(passwordEncoder.encode(request.resolvedPasswordInput()))
                 .role(UserRole.USER)
                 .active(Boolean.TRUE)
                 .createdAt(now)
@@ -81,9 +81,10 @@ public class AuthServiceImpl implements AuthService {
     @Transactional(readOnly = true)
     public LoginResponseDto login(LoginRequestDto request) {
         String email = normalizeEmail(request.email());
+        String credential = request.resolvedPasswordInput();
         try {
             authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(email, request.password())
+                    new UsernamePasswordAuthenticationToken(email, credential)
             );
         } catch (BadCredentialsException ex) {
             throw new ApiException("INVALID_CREDENTIALS", "Invalid email or password.", HttpStatus.UNAUTHORIZED);
