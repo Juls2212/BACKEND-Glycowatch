@@ -1,32 +1,53 @@
 package com.glycowatch.auth.dto;
 
 import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Size;
 import java.util.Locale;
 
 public record RegisterRequestDto(
         @Email(message = "Email format is invalid.")
-        @NotBlank(message = "Email is required.")
+        @jakarta.validation.constraints.NotBlank(message = "Email is required.")
         @Size(max = 255, message = "Email cannot exceed 255 characters.")
         String email,
 
-        @NotBlank(message = "Password is required.")
-        @Size(min = 8, max = 100, message = "Password must contain between 8 and 100 characters.")
         String password,
 
-        @NotBlank(message = "Full name is required.")
+        String passwordHash,
+
+        @jakarta.validation.constraints.NotBlank(message = "Full name is required.")
         @Size(max = 255, message = "Full name cannot exceed 255 characters.")
         String fullName
 ) {
     public RegisterRequestDto {
         email = normalizeEmail(email);
+        password = normalizeCredential(password);
+        passwordHash = normalizeCredential(passwordHash);
         fullName = trimToNull(fullName);
+    }
+
+    @AssertTrue(message = "Password hash or password is required.")
+    public boolean hasCredential() {
+        return resolvedPasswordInput() != null;
+    }
+
+    @AssertTrue(message = "Password hash or password must contain between 8 and 255 characters.")
+    public boolean hasValidCredentialLength() {
+        String credential = resolvedPasswordInput();
+        return credential == null || (credential.length() >= 8 && credential.length() <= 255);
+    }
+
+    public String resolvedPasswordInput() {
+        return passwordHash != null ? passwordHash : password;
     }
 
     private static String normalizeEmail(String value) {
         String trimmed = trimToNull(value);
         return trimmed == null ? null : trimmed.toLowerCase(Locale.ROOT);
+    }
+
+    private static String normalizeCredential(String value) {
+        return trimToNull(value);
     }
 
     private static String trimToNull(String value) {
