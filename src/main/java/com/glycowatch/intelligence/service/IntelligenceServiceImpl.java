@@ -149,6 +149,8 @@ public class IntelligenceServiceImpl implements IntelligenceService {
                 analysis,
                 readStringList(analysis.getDetectedFactors()),
                 readStringList(analysis.getRecommendations()),
+                readStringList(analysis.getDetectedFactorsSnapshot()),
+                readStringList(analysis.getRecommendationsSnapshot()),
                 readObjectMap(analysis.getMetricsSnapshot()),
                 readObjectList(analysis.getMeasurementsSnapshot()),
                 readObjectMap(analysis.getRuleBasedAnalysisSnapshot()),
@@ -415,11 +417,15 @@ public class IntelligenceServiceImpl implements IntelligenceService {
     ) {
         Map<String, Object> metricsSnapshot = new LinkedHashMap<>();
         metricsSnapshot.put("latestValue", ruleBasedAnalysis.metrics().getLatestValue());
+        metricsSnapshot.put("average", ruleBasedAnalysis.metrics().getAverageLast7d());
         metricsSnapshot.put("averageLast24h", ruleBasedAnalysis.metrics().getAverageLast24h());
         metricsSnapshot.put("averageLast7d", ruleBasedAnalysis.metrics().getAverageLast7d());
+        metricsSnapshot.put("min", ruleBasedAnalysis.metrics().getMinLast7d());
         metricsSnapshot.put("minLast7d", ruleBasedAnalysis.metrics().getMinLast7d());
+        metricsSnapshot.put("max", ruleBasedAnalysis.metrics().getMaxLast7d());
         metricsSnapshot.put("maxLast7d", ruleBasedAnalysis.metrics().getMaxLast7d());
         metricsSnapshot.put("variability", ruleBasedAnalysis.metrics().getVariability());
+        metricsSnapshot.put("count", ruleBasedAnalysis.metrics().getCountLast7d());
         metricsSnapshot.put("countLast24h", ruleBasedAnalysis.metrics().getCountLast24h());
         metricsSnapshot.put("countLast7d", ruleBasedAnalysis.metrics().getCountLast7d());
         metricsSnapshot.put("manualReadingsCount", ruleBasedAnalysis.metrics().getManualReadingsCount());
@@ -471,7 +477,9 @@ public class IntelligenceServiceImpl implements IntelligenceService {
                 measurementSnapshots,
                 ruleBasedAnalysisSnapshot,
                 externalAiAnalysisSnapshot,
-                finalMergedAnalysisSnapshot
+                finalMergedAnalysisSnapshot,
+                response.getDetectedFactors(),
+                response.getRecommendations()
         );
     }
 
