@@ -1,5 +1,7 @@
 package com.glycowatch.intelligence.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.glycowatch.auth.model.UserEntity;
 import com.glycowatch.auth.repository.UserRepository;
 import com.glycowatch.common.exception.ApiException;
@@ -22,6 +24,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -45,10 +48,19 @@ public class IntelligenceServiceImpl implements IntelligenceService {
     private final ExternalIntelligenceProvider externalIntelligenceProvider;
     private final IntelligenceAnalysisPersistenceService intelligenceAnalysisPersistenceService;
     private final HybridRiskResolver hybridRiskResolver;
+    private final ObjectMapper objectMapper;
+
+    @Override
+    public IntelligenceSummaryResponse getSummary(String authenticatedEmail) {
+        UserEntity user = resolveActiveUser(authenticatedEmail);
+        return intelligenceAnalysisPersistenceService.findLatestAnalysis(user.getId())
+                .map(this::toStoredSummaryResponse)
+                .orElseGet(this::buildNoGeneratedAnalysisResponse);
+    }
 
     @Override
     @Transactional
-    public IntelligenceSummaryResponse getSummary(String authenticatedEmail) {
+    public IntelligenceSummaryResponse generateSummary(String authenticatedEmail) {
         UserEntity user = resolveActiveUser(authenticatedEmail);
         UserProfileEntity profile = userProfileRepository.findByUserId(user.getId()).orElse(null);
         ThresholdWindow thresholds = resolveThresholds(profile);
@@ -173,6 +185,19 @@ public class IntelligenceServiceImpl implements IntelligenceService {
                 ruleBasedIntelligenceAnalyzer.determineAssistantMood(RiskLevel.INSUFFICIENT_DATA),
                 List.of("Datos insuficientes para analizar tendencias recientes"),
                 List.of("Continua registrando mediciones para habilitar un analisis mas completo."),
+                DISCLAIMER,
+                Instant.now()
+        );
+    }
+
+    private IntelligenceSummaryResponse buildNoGeneratedAnalysisResponse() {
+        String summary = "Todavia no has generado un analisis inteligente reciente.";
+        return intelligenceSummaryMapper.toInsufficientDataResponse(
+                summary,
+                "Cuando quieras, puedes solicitar un nuevo analisis para interpretar tus mediciones recientes.",
+                ruleBasedIntelligenceAnalyzer.determineAssistantMood(RiskLevel.INSUFFICIENT_DATA),
+                List.of("Aun no existe un analisis inteligente generado manualmente"),
+                List.of("Solicita un analisis cuando quieras revisar tus mediciones recientes."),
                 DISCLAIMER,
                 Instant.now()
         );
@@ -341,6 +366,27 @@ public class IntelligenceServiceImpl implements IntelligenceService {
                 .summary(analysis.getSummary())
                 .createdAt(analysis.getCreatedAt())
                 .build();
+    }
+
+    private IntelligenceSummaryResponse toStoredSummaryResponse(IntelligenceAnalysis analysis) {
+        return intelligenceSummaryMapper.fromStoredAnalysis(
+                analysis,
+                readStringList(analysis.getDetectedFactors()),
+                readStringList(analysis.getRecommendations()),
+                DISCLAIMER
+        );
+    }
+
+    private List<String> readStringList(String rawJson) {
+        if (rawJson == null || rawJson.isBlank()) {
+            return List.of();
+        }
+        try {
+            return objectMapper.readValue(rawJson, new TypeReference<List<String>>() {
+            });
+        } catch (Exception ex) {
+            return List.of();
+        }
     }
 
     private record ThresholdWindow(
