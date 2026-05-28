@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.glycowatch.auth.model.UserEntity;
 import com.glycowatch.auth.repository.UserRepository;
 import com.glycowatch.common.exception.ApiException;
+import com.glycowatch.intelligence.dto.IntelligenceAnalysisDetailResponse;
 import com.glycowatch.intelligence.dto.IntelligenceHistoryItemResponse;
 import com.glycowatch.intelligence.dto.IntelligenceSummaryResponse;
 import com.glycowatch.intelligence.integration.ExternalAIAnalysisResult;
@@ -23,7 +24,9 @@ import com.glycowatch.profile.repository.UserProfileRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -115,7 +118,14 @@ public class IntelligenceServiceImpl implements IntelligenceService {
                 generatedAt
         );
 
-        intelligenceAnalysisPersistenceService.saveAnalysis(user.getId(), response);
+        IntelligenceAnalysisRecordContext analysisRecordContext = buildAnalysisRecordContext(
+                thresholds,
+                ruleBasedAnalysis,
+                last7DaysMeasurements,
+                hybridAnalysis,
+                response
+        );
+        intelligenceAnalysisPersistenceService.saveAnalysis(user.getId(), response, analysisRecordContext);
         return response;
     }
 
@@ -126,6 +136,25 @@ public class IntelligenceServiceImpl implements IntelligenceService {
         return intelligenceAnalysisRepository.findTop20ByUserIdOrderByCreatedAtDesc(user.getId()).stream()
                 .map(this::toHistoryItemResponse)
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public IntelligenceAnalysisDetailResponse getAnalysisDetail(String authenticatedEmail, Long analysisId) {
+        UserEntity user = resolveActiveUser(authenticatedEmail);
+        IntelligenceAnalysis analysis = intelligenceAnalysisPersistenceService.findAnalysisDetail(user.getId(), analysisId)
+                .orElseThrow(() -> new ApiException("INTELLIGENCE_ANALYSIS_NOT_FOUND", "Intelligence analysis was not found.", HttpStatus.NOT_FOUND));
+
+        return intelligenceSummaryMapper.toDetailResponse(
+                analysis,
+                readStringList(analysis.getDetectedFactors()),
+                readStringList(analysis.getRecommendations()),
+                readObjectMap(analysis.getMetricsSnapshot()),
+                readObjectList(analysis.getMeasurementsSnapshot()),
+                readObjectMap(analysis.getRuleBasedAnalysisSnapshot()),
+                readObjectMap(analysis.getExternalAiAnalysisSnapshot()),
+                readObjectMap(analysis.getFinalMergedAnalysisSnapshot())
+        );
     }
 
     private UserEntity resolveActiveUser(String authenticatedEmail) {
@@ -377,12 +406,117 @@ public class IntelligenceServiceImpl implements IntelligenceService {
         );
     }
 
+    private IntelligenceAnalysisRecordContext buildAnalysisRecordContext(
+            ThresholdWindow thresholds,
+            RuleBasedIntelligenceAnalyzer.RuleBasedAnalysis ruleBasedAnalysis,
+            List<GlucoseMeasurementEntity> consideredMeasurements,
+            HybridAnalysis hybridAnalysis,
+            IntelligenceSummaryResponse response
+    ) {
+        Map<String, Object> metricsSnapshot = new LinkedHashMap<>();
+        metricsSnapshot.put("latestValue", ruleBasedAnalysis.metrics().getLatestValue());
+        metricsSnapshot.put("averageLast24h", ruleBasedAnalysis.metrics().getAverageLast24h());
+        metricsSnapshot.put("averageLast7d", ruleBasedAnalysis.metrics().getAverageLast7d());
+        metricsSnapshot.put("minLast7d", ruleBasedAnalysis.metrics().getMinLast7d());
+        metricsSnapshot.put("maxLast7d", ruleBasedAnalysis.metrics().getMaxLast7d());
+        metricsSnapshot.put("variability", ruleBasedAnalysis.metrics().getVariability());
+        metricsSnapshot.put("countLast24h", ruleBasedAnalysis.metrics().getCountLast24h());
+        metricsSnapshot.put("countLast7d", ruleBasedAnalysis.metrics().getCountLast7d());
+        metricsSnapshot.put("manualReadingsCount", ruleBasedAnalysis.metrics().getManualReadingsCount());
+        metricsSnapshot.put("hardwareReadingsCount", ruleBasedAnalysis.metrics().getHardwareReadingsCount());
+        metricsSnapshot.put("highReadingsCount", ruleBasedAnalysis.metrics().getHighReadingsCount());
+        metricsSnapshot.put("lowReadingsCount", ruleBasedAnalysis.metrics().getLowReadingsCount());
+        metricsSnapshot.put("recentWindowHours", 24);
+        metricsSnapshot.put("trendWindowDays", 7);
+
+        List<Map<String, Object>> measurementSnapshots = consideredMeasurements.stream()
+                .map(this::toMeasurementSnapshot)
+                .toList();
+
+        Map<String, Object> ruleBasedAnalysisSnapshot = new LinkedHashMap<>();
+        ruleBasedAnalysisSnapshot.put("riskLevel", ruleBasedAnalysis.riskLevel().name());
+        ruleBasedAnalysisSnapshot.put("trend", ruleBasedAnalysis.trend().name());
+        ruleBasedAnalysisSnapshot.put("confidence", ruleBasedAnalysis.confidence().name());
+        ruleBasedAnalysisSnapshot.put("assistantMood", ruleBasedAnalysis.assistantMood().name());
+        ruleBasedAnalysisSnapshot.put("summary", ruleBasedAnalysis.summary());
+        ruleBasedAnalysisSnapshot.put("detectedFactors", ruleBasedAnalysis.detectedFactors());
+        ruleBasedAnalysisSnapshot.put("recommendations", ruleBasedAnalysis.recommendations());
+
+        Map<String, Object> externalAiAnalysisSnapshot = new LinkedHashMap<>();
+        if (hybridAnalysis.externalAiRiskLevel() != null) {
+            externalAiAnalysisSnapshot.put("riskLevel", hybridAnalysis.externalAiRiskLevel());
+            externalAiAnalysisSnapshot.put("aiExplanation", hybridAnalysis.aiExplanation());
+            externalAiAnalysisSnapshot.put("assistantMessage", hybridAnalysis.assistantMessage());
+            externalAiAnalysisSnapshot.put("recommendations", hybridAnalysis.recommendations());
+        }
+
+        Map<String, Object> finalMergedAnalysisSnapshot = new LinkedHashMap<>();
+        finalMergedAnalysisSnapshot.put("ruleBasedRiskLevel", response.getRuleBasedRiskLevel());
+        finalMergedAnalysisSnapshot.put("externalAiRiskLevel", response.getGeminiRiskLevel());
+        finalMergedAnalysisSnapshot.put("finalRiskLevel", response.getFinalRiskLevel());
+        finalMergedAnalysisSnapshot.put("agreementStatus", response.getAgreementStatus());
+        finalMergedAnalysisSnapshot.put("trend", response.getTrend());
+        finalMergedAnalysisSnapshot.put("confidence", response.getConfidence());
+        finalMergedAnalysisSnapshot.put("assistantMood", response.getAssistantMood());
+        finalMergedAnalysisSnapshot.put("summary", response.getSummary());
+        finalMergedAnalysisSnapshot.put("aiExplanation", response.getAiExplanation());
+        finalMergedAnalysisSnapshot.put("assistantMessage", response.getAssistantMessage());
+        finalMergedAnalysisSnapshot.put("detectedFactors", response.getDetectedFactors());
+        finalMergedAnalysisSnapshot.put("recommendations", response.getRecommendations());
+
+        return new IntelligenceAnalysisRecordContext(
+                thresholds.hypoglycemiaThreshold(),
+                thresholds.hyperglycemiaThreshold(),
+                metricsSnapshot,
+                measurementSnapshots,
+                ruleBasedAnalysisSnapshot,
+                externalAiAnalysisSnapshot,
+                finalMergedAnalysisSnapshot
+        );
+    }
+
+    private Map<String, Object> toMeasurementSnapshot(GlucoseMeasurementEntity measurement) {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("id", measurement.getId());
+        snapshot.put("glucoseValue", measurement.getGlucoseValue());
+        snapshot.put("unit", measurement.getUnit());
+        snapshot.put("measuredAt", measurement.getMeasuredAt());
+        snapshot.put("receivedAt", measurement.getReceivedAt());
+        snapshot.put("origin", measurement.getOrigin() == null ? null : measurement.getOrigin().name());
+        snapshot.put("deviceId", measurement.getDevice() == null ? null : measurement.getDevice().getId());
+        return snapshot;
+    }
+
     private List<String> readStringList(String rawJson) {
         if (rawJson == null || rawJson.isBlank()) {
             return List.of();
         }
         try {
             return objectMapper.readValue(rawJson, new TypeReference<List<String>>() {
+            });
+        } catch (Exception ex) {
+            return List.of();
+        }
+    }
+
+    private Map<String, Object> readObjectMap(String rawJson) {
+        if (rawJson == null || rawJson.isBlank()) {
+            return Map.of();
+        }
+        try {
+            return objectMapper.readValue(rawJson, new TypeReference<Map<String, Object>>() {
+            });
+        } catch (Exception ex) {
+            return Map.of();
+        }
+    }
+
+    private List<Map<String, Object>> readObjectList(String rawJson) {
+        if (rawJson == null || rawJson.isBlank()) {
+            return List.of();
+        }
+        try {
+            return objectMapper.readValue(rawJson, new TypeReference<List<Map<String, Object>>>() {
             });
         } catch (Exception ex) {
             return List.of();
