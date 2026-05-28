@@ -8,6 +8,8 @@ public class GlucoseAnalysisMetrics {
     private Double maxLast7d;
     private Integer countLast24h;
     private Integer countLast7d;
+    private Integer manualReadingsCount;
+    private Integer hardwareReadingsCount;
     private Integer highReadingsCount;
     private Integer lowReadingsCount;
     private Double variability;
@@ -59,6 +61,22 @@ public class GlucoseAnalysisMetrics {
 
     public void setCountLast7d(Integer countLast7d) {
         this.countLast7d = countLast7d;
+    }
+
+    public Integer getManualReadingsCount() {
+        return manualReadingsCount;
+    }
+
+    public void setManualReadingsCount(Integer manualReadingsCount) {
+        this.manualReadingsCount = manualReadingsCount;
+    }
+
+    public Integer getHardwareReadingsCount() {
+        return hardwareReadingsCount;
+    }
+
+    public void setHardwareReadingsCount(Integer hardwareReadingsCount) {
+        this.hardwareReadingsCount = hardwareReadingsCount;
     }
 
     public Integer getHighReadingsCount() {
