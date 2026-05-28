@@ -34,8 +34,15 @@ public class IntelligenceAnalysisDetailResponse {
     private BigDecimal hypoglycemiaThreshold;
     private BigDecimal hyperglycemiaThreshold;
     private Map<String, Object> metrics;
+    private Map<String, Object> metricsSnapshot;
     private List<Map<String, Object>> measurements;
+    private List<Map<String, Object>> measurementsSnapshot;
     private Map<String, Object> ruleBasedAnalysis;
+    private Map<String, Object> ruleBasedAnalysisSnapshot;
     private Map<String, Object> externalAiAnalysis;
+    private Map<String, Object> externalAiAnalysisSnapshot;
     private Map<String, Object> finalMergedAnalysis;
+    private Map<String, Object> finalMergedAnalysisSnapshot;
+    private List<String> detectedFactorsSnapshot;
+    private List<String> recommendationsSnapshot;
 }
