@@ -1,6 +1,7 @@
 package com.glycowatch.intelligence.controller;
 
 import com.glycowatch.common.dto.response.ApiResponse;
+import com.glycowatch.intelligence.dto.IntelligenceAnalysisDetailResponse;
 import com.glycowatch.intelligence.dto.IntelligenceHistoryItemResponse;
 import com.glycowatch.intelligence.dto.IntelligenceSummaryResponse;
 import com.glycowatch.intelligence.service.IntelligenceService;
@@ -13,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -72,6 +74,25 @@ public class IntelligenceController {
                 ApiResponse.<List<IntelligenceHistoryItemResponse>>builder()
                         .success(true)
                         .message("Intelligence history retrieved successfully.")
+                        .data(data)
+                        .timestamp(Instant.now())
+                        .path(httpRequest.getRequestURI())
+                        .build()
+        );
+    }
+
+    @GetMapping("/history/{id}")
+    @Operation(summary = "Get intelligence analysis detail for authenticated user")
+    public ResponseEntity<ApiResponse<IntelligenceAnalysisDetailResponse>> getHistoryDetail(
+            Authentication authentication,
+            @PathVariable Long id,
+            HttpServletRequest httpRequest
+    ) {
+        IntelligenceAnalysisDetailResponse data = intelligenceService.getAnalysisDetail(authentication.getName(), id);
+        return ResponseEntity.ok(
+                ApiResponse.<IntelligenceAnalysisDetailResponse>builder()
+                        .success(true)
+                        .message("Intelligence analysis detail retrieved successfully.")
                         .data(data)
                         .timestamp(Instant.now())
                         .path(httpRequest.getRequestURI())
