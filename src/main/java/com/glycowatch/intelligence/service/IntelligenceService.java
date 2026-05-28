@@ -8,5 +8,7 @@ public interface IntelligenceService {
 
     IntelligenceSummaryResponse getSummary(String authenticatedEmail);
 
+    IntelligenceSummaryResponse generateSummary(String authenticatedEmail);
+
     List<IntelligenceHistoryItemResponse> getHistory(String authenticatedEmail);
 }
