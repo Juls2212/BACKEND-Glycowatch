@@ -1,6 +1,7 @@
 package com.glycowatch.intelligence.service;
 
 import com.glycowatch.intelligence.dto.IntelligenceSummaryResponse;
+import com.glycowatch.intelligence.model.IntelligenceAnalysis;
 import com.glycowatch.intelligence.model.AgreementStatus;
 import com.glycowatch.intelligence.model.AssistantMood;
 import com.glycowatch.intelligence.model.GlucoseTrend;
@@ -76,6 +77,32 @@ public class IntelligenceSummaryMapper {
                 .recommendations(recommendations)
                 .disclaimer(disclaimer)
                 .generatedAt(generatedAt)
+                .build();
+    }
+
+    public IntelligenceSummaryResponse fromStoredAnalysis(
+            IntelligenceAnalysis analysis,
+            List<String> detectedFactors,
+            List<String> recommendations,
+            String disclaimer
+    ) {
+        return IntelligenceSummaryResponse.builder()
+                .riskLevel(analysis.getRuleBasedRiskLevel())
+                .ruleBasedRiskLevel(analysis.getRuleBasedRiskLevel())
+                .geminiRiskLevel(analysis.getGeminiRiskLevel())
+                .finalRiskLevel(analysis.getFinalRiskLevel())
+                .agreementStatus(analysis.getAgreementStatus())
+                .trend(analysis.getTrend())
+                .confidence(analysis.getConfidence())
+                .assistantMood(analysis.getAssistantMood())
+                .summary(analysis.getSummary())
+                .aiExplanation(analysis.getAiExplanation())
+                .assistantMessage(analysis.getAssistantMessage())
+                .geminiAvailable(analysis.getGeminiRiskLevel() != null)
+                .detectedFactors(detectedFactors)
+                .recommendations(recommendations)
+                .disclaimer(disclaimer)
+                .generatedAt(analysis.getCreatedAt())
                 .build();
     }
 }
