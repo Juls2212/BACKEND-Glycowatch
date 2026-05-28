@@ -12,6 +12,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -35,6 +36,24 @@ public class IntelligenceController {
                 ApiResponse.<IntelligenceSummaryResponse>builder()
                         .success(true)
                         .message("Intelligence summary retrieved successfully.")
+                        .data(data)
+                        .timestamp(Instant.now())
+                        .path(httpRequest.getRequestURI())
+                        .build()
+        );
+    }
+
+    @PostMapping("/summary/generate")
+    @Operation(summary = "Generate a fresh intelligence summary for authenticated user")
+    public ResponseEntity<ApiResponse<IntelligenceSummaryResponse>> generateSummary(
+            Authentication authentication,
+            HttpServletRequest httpRequest
+    ) {
+        IntelligenceSummaryResponse data = intelligenceService.generateSummary(authentication.getName());
+        return ResponseEntity.ok(
+                ApiResponse.<IntelligenceSummaryResponse>builder()
+                        .success(true)
+                        .message("Intelligence summary generated successfully.")
                         .data(data)
                         .timestamp(Instant.now())
                         .path(httpRequest.getRequestURI())
