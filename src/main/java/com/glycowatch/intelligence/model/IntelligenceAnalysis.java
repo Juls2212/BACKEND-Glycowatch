@@ -88,6 +88,12 @@ public class IntelligenceAnalysis {
     @Column(name = "final_merged_analysis_snapshot", columnDefinition = "TEXT")
     private String finalMergedAnalysisSnapshot;
 
+    @Column(name = "detected_factors_snapshot", columnDefinition = "TEXT")
+    private String detectedFactorsSnapshot;
+
+    @Column(name = "recommendations_snapshot", columnDefinition = "TEXT")
+    private String recommendationsSnapshot;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
