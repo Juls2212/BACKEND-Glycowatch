@@ -10,6 +10,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -50,6 +51,13 @@ public class IntelligenceAnalysisPersistenceService {
                 .build();
 
         intelligenceAnalysisRepository.save(analysis);
+    }
+
+    public Optional<IntelligenceAnalysis> findLatestAnalysis(Long userId) {
+        if (userId == null) {
+            return Optional.empty();
+        }
+        return intelligenceAnalysisRepository.findFirstByUserIdOrderByCreatedAtDesc(userId);
     }
 
     private boolean shouldSkipSave(Long userId, IntelligenceSummaryResponse response) {
