@@ -6,6 +6,7 @@ import com.glycowatch.intelligence.model.GlucoseTrend;
 import com.glycowatch.intelligence.model.IntelligenceConfidence;
 import com.glycowatch.intelligence.model.RiskLevel;
 import com.glycowatch.measurement.model.GlucoseMeasurementEntity;
+import com.glycowatch.measurement.model.MeasurementOrigin;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -82,6 +83,8 @@ public class RuleBasedIntelligenceAnalyzer {
 
         metrics.setCountLast24h(safeLast24HoursMeasurements.size());
         metrics.setCountLast7d(safeLast7DaysMeasurements.size());
+        metrics.setManualReadingsCount(countByOrigin(safeLast7DaysMeasurements, MeasurementOrigin.MANUAL));
+        metrics.setHardwareReadingsCount(countByOrigin(safeLast7DaysMeasurements, MeasurementOrigin.IOT));
         metrics.setAverageLast24h(averageOf(safeLast24HoursMeasurements));
         metrics.setAverageLast7d(averageOf(safeLast7DaysMeasurements));
         metrics.setMinLast7d(minOf(safeLast7DaysMeasurements));
@@ -167,6 +170,19 @@ public class RuleBasedIntelligenceAnalyzer {
                 measurements.stream()
                         .map(GlucoseMeasurementEntity::getGlucoseValue)
                         .filter(value -> value != null && value.compareTo(highThreshold) > 0)
+                        .count()
+        );
+    }
+
+    private Integer countByOrigin(List<GlucoseMeasurementEntity> measurements, MeasurementOrigin origin) {
+        if (origin == null || measurements.isEmpty()) {
+            return 0;
+        }
+
+        return Math.toIntExact(
+                measurements.stream()
+                        .map(GlucoseMeasurementEntity::getOrigin)
+                        .filter(origin::equals)
                         .count()
         );
     }
