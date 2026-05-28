@@ -1,5 +1,6 @@
 package com.glycowatch.intelligence.service;
 
+import com.glycowatch.intelligence.dto.IntelligenceAnalysisDetailResponse;
 import com.glycowatch.intelligence.dto.IntelligenceSummaryResponse;
 import com.glycowatch.intelligence.model.IntelligenceAnalysis;
 import com.glycowatch.intelligence.model.AgreementStatus;
@@ -9,6 +10,7 @@ import com.glycowatch.intelligence.model.IntelligenceConfidence;
 import com.glycowatch.intelligence.model.RiskLevel;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -103,6 +105,41 @@ public class IntelligenceSummaryMapper {
                 .recommendations(recommendations)
                 .disclaimer(disclaimer)
                 .generatedAt(analysis.getCreatedAt())
+                .build();
+    }
+
+    public IntelligenceAnalysisDetailResponse toDetailResponse(
+            IntelligenceAnalysis analysis,
+            List<String> detectedFactors,
+            List<String> recommendations,
+            Map<String, Object> metrics,
+            List<Map<String, Object>> measurements,
+            Map<String, Object> ruleBasedAnalysis,
+            Map<String, Object> externalAiAnalysis,
+            Map<String, Object> finalMergedAnalysis
+    ) {
+        return IntelligenceAnalysisDetailResponse.builder()
+                .id(analysis.getId())
+                .generatedAt(analysis.getCreatedAt())
+                .ruleBasedRiskLevel(analysis.getRuleBasedRiskLevel())
+                .externalAiRiskLevel(analysis.getGeminiRiskLevel())
+                .finalRiskLevel(analysis.getFinalRiskLevel())
+                .agreementStatus(analysis.getAgreementStatus())
+                .trend(analysis.getTrend())
+                .confidence(analysis.getConfidence())
+                .assistantMood(analysis.getAssistantMood())
+                .summary(analysis.getSummary())
+                .aiExplanation(analysis.getAiExplanation())
+                .assistantMessage(analysis.getAssistantMessage())
+                .detectedFactors(detectedFactors)
+                .recommendations(recommendations)
+                .hypoglycemiaThreshold(analysis.getHypoglycemiaThreshold())
+                .hyperglycemiaThreshold(analysis.getHyperglycemiaThreshold())
+                .metrics(metrics)
+                .measurements(measurements)
+                .ruleBasedAnalysis(ruleBasedAnalysis)
+                .externalAiAnalysis(externalAiAnalysis)
+                .finalMergedAnalysis(finalMergedAnalysis)
                 .build();
     }
 }
