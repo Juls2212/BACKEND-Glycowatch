@@ -11,6 +11,8 @@ public record IntelligenceAnalysisRecordContext(
         List<Map<String, Object>> measurementsSnapshot,
         Map<String, Object> ruleBasedAnalysisSnapshot,
         Map<String, Object> externalAiAnalysisSnapshot,
-        Map<String, Object> finalMergedAnalysisSnapshot
+        Map<String, Object> finalMergedAnalysisSnapshot,
+        List<String> detectedFactorsSnapshot,
+        List<String> recommendationsSnapshot
 ) {
 }
