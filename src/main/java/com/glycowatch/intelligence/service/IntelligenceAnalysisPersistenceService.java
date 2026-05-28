@@ -24,7 +24,7 @@ public class IntelligenceAnalysisPersistenceService {
     private final IntelligenceAnalysisRepository intelligenceAnalysisRepository;
     private final ObjectMapper objectMapper;
 
-    public void saveAnalysis(Long userId, IntelligenceSummaryResponse response) {
+    public void saveAnalysis(Long userId, IntelligenceSummaryResponse response, IntelligenceAnalysisRecordContext context) {
         if (userId == null || response == null) {
             return;
         }
@@ -47,6 +47,13 @@ public class IntelligenceAnalysisPersistenceService {
                 .detectedFactors(toJson(response.getDetectedFactors()))
                 .recommendations(toJson(response.getRecommendations()))
                 .agreementStatus(response.getAgreementStatus())
+                .hypoglycemiaThreshold(context == null ? null : context.hypoglycemiaThreshold())
+                .hyperglycemiaThreshold(context == null ? null : context.hyperglycemiaThreshold())
+                .metricsSnapshot(toJsonObject(context == null ? null : context.metricsSnapshot()))
+                .measurementsSnapshot(toJsonObject(context == null ? null : context.measurementsSnapshot()))
+                .ruleBasedAnalysisSnapshot(toJsonObject(context == null ? null : context.ruleBasedAnalysisSnapshot()))
+                .externalAiAnalysisSnapshot(toJsonObject(context == null ? null : context.externalAiAnalysisSnapshot()))
+                .finalMergedAnalysisSnapshot(toJsonObject(context == null ? null : context.finalMergedAnalysisSnapshot()))
                 .createdAt(response.getGeneratedAt())
                 .build();
 
@@ -58,6 +65,13 @@ public class IntelligenceAnalysisPersistenceService {
             return Optional.empty();
         }
         return intelligenceAnalysisRepository.findFirstByUserIdOrderByCreatedAtDesc(userId);
+    }
+
+    public Optional<IntelligenceAnalysis> findAnalysisDetail(Long userId, Long analysisId) {
+        if (userId == null || analysisId == null) {
+            return Optional.empty();
+        }
+        return intelligenceAnalysisRepository.findByIdAndUserId(analysisId, userId);
     }
 
     private boolean shouldSkipSave(Long userId, IntelligenceSummaryResponse response) {
@@ -93,6 +107,21 @@ public class IntelligenceAnalysisPersistenceService {
         List<String> safeValues = values == null ? List.of() : values;
         try {
             return objectMapper.writeValueAsString(safeValues);
+        } catch (JsonProcessingException ex) {
+            throw new ApiException(
+                    "INTELLIGENCE_SERIALIZATION_ERROR",
+                    "Unable to serialize intelligence analysis details.",
+                    HttpStatus.INTERNAL_SERVER_ERROR
+            );
+        }
+    }
+
+    private String toJsonObject(Object value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return objectMapper.writeValueAsString(value);
         } catch (JsonProcessingException ex) {
             throw new ApiException(
                     "INTELLIGENCE_SERIALIZATION_ERROR",
