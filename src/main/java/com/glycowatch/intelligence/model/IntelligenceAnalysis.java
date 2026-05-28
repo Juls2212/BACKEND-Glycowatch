@@ -7,6 +7,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import java.time.Instant;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -65,6 +66,27 @@ public class IntelligenceAnalysis {
 
     @Column(name = "agreement_status", nullable = false, length = 50)
     private String agreementStatus;
+
+    @Column(name = "hypoglycemia_threshold", precision = 10, scale = 2)
+    private BigDecimal hypoglycemiaThreshold;
+
+    @Column(name = "hyperglycemia_threshold", precision = 10, scale = 2)
+    private BigDecimal hyperglycemiaThreshold;
+
+    @Column(name = "metrics_snapshot", columnDefinition = "TEXT")
+    private String metricsSnapshot;
+
+    @Column(name = "measurements_snapshot", columnDefinition = "TEXT")
+    private String measurementsSnapshot;
+
+    @Column(name = "rule_based_analysis_snapshot", columnDefinition = "TEXT")
+    private String ruleBasedAnalysisSnapshot;
+
+    @Column(name = "external_ai_analysis_snapshot", columnDefinition = "TEXT")
+    private String externalAiAnalysisSnapshot;
+
+    @Column(name = "final_merged_analysis_snapshot", columnDefinition = "TEXT")
+    private String finalMergedAnalysisSnapshot;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
