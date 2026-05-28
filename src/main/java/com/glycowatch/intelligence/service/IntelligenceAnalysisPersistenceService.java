@@ -54,6 +54,8 @@ public class IntelligenceAnalysisPersistenceService {
                 .ruleBasedAnalysisSnapshot(toJsonObject(context == null ? null : context.ruleBasedAnalysisSnapshot()))
                 .externalAiAnalysisSnapshot(toJsonObject(context == null ? null : context.externalAiAnalysisSnapshot()))
                 .finalMergedAnalysisSnapshot(toJsonObject(context == null ? null : context.finalMergedAnalysisSnapshot()))
+                .detectedFactorsSnapshot(toJson(context == null ? null : context.detectedFactorsSnapshot()))
+                .recommendationsSnapshot(toJson(context == null ? null : context.recommendationsSnapshot()))
                 .createdAt(response.getGeneratedAt())
                 .build();
 
