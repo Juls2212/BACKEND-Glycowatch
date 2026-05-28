@@ -112,6 +112,8 @@ public class IntelligenceSummaryMapper {
             IntelligenceAnalysis analysis,
             List<String> detectedFactors,
             List<String> recommendations,
+            List<String> detectedFactorsSnapshot,
+            List<String> recommendationsSnapshot,
             Map<String, Object> metrics,
             List<Map<String, Object>> measurements,
             Map<String, Object> ruleBasedAnalysis,
@@ -136,10 +138,17 @@ public class IntelligenceSummaryMapper {
                 .hypoglycemiaThreshold(analysis.getHypoglycemiaThreshold())
                 .hyperglycemiaThreshold(analysis.getHyperglycemiaThreshold())
                 .metrics(metrics)
+                .metricsSnapshot(metrics)
                 .measurements(measurements)
+                .measurementsSnapshot(measurements)
                 .ruleBasedAnalysis(ruleBasedAnalysis)
+                .ruleBasedAnalysisSnapshot(ruleBasedAnalysis)
                 .externalAiAnalysis(externalAiAnalysis)
+                .externalAiAnalysisSnapshot(externalAiAnalysis)
                 .finalMergedAnalysis(finalMergedAnalysis)
+                .finalMergedAnalysisSnapshot(finalMergedAnalysis)
+                .detectedFactorsSnapshot(detectedFactorsSnapshot)
+                .recommendationsSnapshot(recommendationsSnapshot)
                 .build();
     }
 }
