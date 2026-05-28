@@ -12,4 +12,6 @@ public interface IntelligenceAnalysisRepository extends JpaRepository<Intelligen
     List<IntelligenceAnalysis> findTop20ByUserIdOrderByCreatedAtDesc(Long userId);
 
     Optional<IntelligenceAnalysis> findFirstByUserIdOrderByCreatedAtDesc(Long userId);
+
+    Optional<IntelligenceAnalysis> findByIdAndUserId(Long id, Long userId);
 }
