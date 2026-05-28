@@ -193,6 +193,8 @@ public class GeminiClient {
                 - lowReadingsCount: %s
                 - countLast24h: %s
                 - countLast7d: %s
+                - manualReadingsCount: %s
+                - hardwareReadingsCount: %s
                 - variability: %s
                 - trend: %s
                 - recentWindow: ultimas 24 horas
@@ -210,6 +212,8 @@ public class GeminiClient {
                 valueOrNull(metrics.getLowReadingsCount()),
                 valueOrNull(metrics.getCountLast24h()),
                 valueOrNull(metrics.getCountLast7d()),
+                valueOrNull(metrics.getManualReadingsCount()),
+                valueOrNull(metrics.getHardwareReadingsCount()),
                 valueOrNull(metrics.getVariability()),
                 trend.name(),
                 ruleBasedRiskLevel.name(),
